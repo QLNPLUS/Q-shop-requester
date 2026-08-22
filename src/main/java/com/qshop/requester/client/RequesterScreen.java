@@ -101,6 +101,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         targetPage = 0;
     }
 
+    private void refreshSearchDropdown() {
+        targetPage = 0;
+        dropdown = tab == 1 && searchInput != null && !filteredTargets().isEmpty();
+    }
+
     @Override protected void renderBg(GuiGraphics g, float partial, int mx, int my) {
         // Match Q-shop sellbox: unselected tabs sit behind the page background.
         for (int page = 0; page < 2; page++) {
@@ -426,6 +431,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         }
         if (tab == 1) {
             if (dropdown) {
+                if (handleSearchClick(mx, my, button)) return true;
                 int x = screenX(RequesterLayoutDebug.Widget.TARGET_BUTTON, 8);
                 int y = screenY(RequesterLayoutDebug.Widget.TARGET_BUTTON, 35);
                 int start = targetPage * 4;
@@ -459,13 +465,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 menu.setSettings(menu.intervalTicks(), menu.actionBar(), !menu.chat(), menu.enabled(),
                         menu.shopId(), menu.tabIndex(), menu.entryIndex()); sendSettings(); return true;
             }
-            int searchX = screenX(RequesterLayoutDebug.Widget.SEARCH_INPUT, 8);
-            int searchY = screenY(RequesterLayoutDebug.Widget.SEARCH_INPUT, 19);
-            if (searchInput != null && inside(mx, my, searchX, searchY, 160, 14)
-                    && searchInput.mouseClicked(mx, my, button)) {
-                if (intervalInput != null) intervalInput.setFocused(false);
-                searchInput.setFocused(true); targetPage = 0; return true;
-            }
+            if (handleSearchClick(mx, my, button)) return true;
             if (intervalInput != null && intervalInput.mouseClicked(mx, my, button)) {
                 if (searchInput != null) searchInput.setFocused(false);
                 intervalInput.setFocused(true); return true;
@@ -499,7 +499,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             }
         }
         if (tab == 1 && searchInput != null && searchInput.isFocused()) {
-            if (searchInput.keyPressed(keyCode, scanCode, modifiers)) { targetPage = 0; return true; }
+            if (searchInput.keyPressed(keyCode, scanCode, modifiers)) {
+                refreshSearchDropdown();
+                return true;
+            }
         }
         if (tab == 1 && intervalInput != null && intervalInput.isFocused()) {
             if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
@@ -512,7 +515,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     @Override public boolean charTyped(char codePoint, int modifiers) {
         if (tab == 1 && searchInput != null && searchInput.isFocused()
-                && searchInput.charTyped(codePoint, modifiers)) { targetPage = 0; return true; }
+                && searchInput.charTyped(codePoint, modifiers)) {
+            refreshSearchDropdown();
+            return true;
+        }
         if (tab == 1 && intervalInput != null && intervalInput.isFocused()
                 && intervalInput.charTyped(codePoint, modifiers)) return true;
         return super.charTyped(codePoint, modifiers);
@@ -524,7 +530,22 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             targetPage = Mth.clamp(targetPage + (delta < 0 ? 1 : -1), 0, maxPage);
             return true;
         }
+        if (tab == 1) return true;
         return super.mouseScrolled(mx, my, delta);
+    }
+
+    @Override public void mouseMoved(double mx, double my) {
+        // EMI can keep updating its hover target through Screen.mouseMoved even
+        // when this custom settings page does not render EMI's item panel.
+        if (tab == 1) return;
+        super.mouseMoved(mx, my);
+    }
+
+    @Override protected void renderTooltip(GuiGraphics g, int mx, int my) {
+        // Do not allow EMI or vanilla tooltip callbacks to leak into the
+        // settings page after its item panel has been hidden.
+        if (tab == 1) return;
+        super.renderTooltip(g, mx, my);
     }
 
     @Override public void removed() { sendSettings(); super.removed(); }
@@ -535,6 +556,20 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     private void drawText(GuiGraphics g, String text, int x, int y, int color) {
         drawText(g, Component.literal(text), x, y, color);
     }
+
+    private boolean handleSearchClick(double mx, double my, int button) {
+        int searchX = screenX(RequesterLayoutDebug.Widget.SEARCH_INPUT, 8);
+        int searchY = screenY(RequesterLayoutDebug.Widget.SEARCH_INPUT, 19);
+        if (searchInput != null && inside(mx, my, searchX, searchY, 160, 14)
+                && searchInput.mouseClicked(mx, my, button)) {
+            if (intervalInput != null) intervalInput.setFocused(false);
+            searchInput.setFocused(true);
+            refreshSearchDropdown();
+            return true;
+        }
+        return false;
+    }
+
     private void drawCentered(GuiGraphics g, String text, int x, int y, int color, int maxWidth) {
         String value = font.plainSubstrByWidth(text, Math.max(1, maxWidth));
         g.drawString(font, value, leftPos + x - font.width(value) / 2, topPos + y, color, true);

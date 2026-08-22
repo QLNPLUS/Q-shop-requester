@@ -31,7 +31,8 @@ import java.util.UUID;
 public final class RequesterService {
     public static final ResourceLocation SOURCE = ResourceLocation.fromNamespaceAndPath(
             RequesterMod.MODID, "auto_request");
-    private static final int MAX_UNITS_PER_CYCLE = 64;
+    // One configured interval performs one shop transaction unit.
+    private static final int UNITS_PER_CYCLE = 1;
     private static final String FORGE_CAPS_KEY = "ForgeCaps";
     private static final String WALLET_CAPABILITY_KEY = "qshop:wallet";
     private static final Object OFFLINE_LIMIT_LOCK = new Object();
@@ -56,9 +57,9 @@ public final class RequesterService {
         }
         TradeResult result = box.selectedType() == ShopEntryType.BARTER
                 ? QShopAddonApi.barter(owner, box.supplied(), box.purchased(), box.shopId(),
-                box.tabIndex(), box.entryIndex(), MAX_UNITS_PER_CYCLE, SOURCE, box.getBlockPos())
+                box.tabIndex(), box.entryIndex(), UNITS_PER_CYCLE, SOURCE, box.getBlockPos())
                 : QShopAddonApi.buy(owner, box.purchased(), box.shopId(), box.tabIndex(),
-                box.entryIndex(), MAX_UNITS_PER_CYCLE, SOURCE, box.getBlockPos());
+                box.entryIndex(), UNITS_PER_CYCLE, SOURCE, box.getBlockPos());
         if (result.isSuccess()) notifySuccess(box, owner, result.getTotalItems());
         else notifyFailure(box, owner, result.getStatus().name());
     }
@@ -89,7 +90,7 @@ public final class RequesterService {
 
     private static int availableUnits(MinecraftServer server, UUID owner, ShopEntry entry,
                                       String key, String period) {
-        int units = MAX_UNITS_PER_CYCLE;
+        int units = UNITS_PER_CYCLE;
         if (entry.globalLimit > 0) {
             int used = QShopSavedData.get(server).globalCounts.getCount(key, period);
             units = Math.min(units, Math.max(0, entry.globalLimit - used));
@@ -350,7 +351,7 @@ public final class RequesterService {
     }
 
     private static TradeResult failure(TradeResult.Status status) {
-        return TradeResult.failure(status, MAX_UNITS_PER_CYCLE, status.name());
+        return TradeResult.failure(status, UNITS_PER_CYCLE, status.name());
     }
 
     private static void notifySuccess(RequesterBlockEntity box, ServerPlayer owner, int totalItems) {

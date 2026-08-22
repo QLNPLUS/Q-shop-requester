@@ -1,0 +1,32 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="ARR"
+showAsResourcePack=false
+
+[[mods]]
+modId="qshop_requester"
+version="${version}"
+displayName="QShop Requester"
+authors="QShop"
+description='''A QShop addon that automatically buys selected shop entries.'''
+
+[[dependencies.qshop_requester]]
+modId="forge"
+mandatory=true
+versionRange="[47.0,48)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.qshop_requester]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.21)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.qshop_requester]]
+modId="qshop"
+mandatory=true
+versionRange="[1.1.0,2.0)"
+ordering="AFTER"
+side="BOTH"

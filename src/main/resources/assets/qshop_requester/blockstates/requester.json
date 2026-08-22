@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "qshop_requester:block/requester" }
+  }
+}

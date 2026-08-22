@@ -1,0 +1,58 @@
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
+}
+
+group = 'com.qshop'
+version = '1.0.0'
+base { archivesName = 'qshop-requester' }
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+minecraft {
+    mappings channel: 'official', version: '1.20.1'
+    runs {
+        configureEach {
+            workingDirectory project.file('run')
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                qshop_requester { source sourceSets.main }
+            }
+        }
+        client {}
+        server {}
+    }
+}
+
+repositories {
+    maven { url = 'https://maven.minecraftforge.net' }
+    mavenCentral()
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.20.1-47.4.20'
+    compileOnly fg.deobf(files('../Q-shop/build/libs/qshop-1.1.0.jar'))
+}
+
+tasks.withType(JavaCompile).configureEach { it.options.encoding = 'UTF-8' }
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching(['META-INF/mods.toml']) { expand version: project.version }
+}
+
+jar {
+    manifest {
+        attributes([
+                'Specification-Title': 'qshop_requester',
+                'Specification-Vendor': 'qshop',
+                'Specification-Version': '1',
+                'Implementation-Title': project.name,
+                'Implementation-Version': project.jar.archiveVersion
+        ])
+    }
+    finalizedBy 'reobfJar'
+}
+

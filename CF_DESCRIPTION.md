@@ -1,32 +1,38 @@
-# QShop 自动收购箱
+# QShop Requester
 
-QShop 的附属自动收购箱 Mod，读取 QShop 商店交易项目并按设定的时间间隔自动完成收购。
+## Short Description
 
-## 功能
+Automatically purchase configured QShop trades with currency or barter, even while the owner is offline.
 
-- 支持货币购买和以物换物两类 QShop 交易项目。
-- 设置页面支持搜索、筛选和选择交易项目。
-- 交易项目显示购买价格、需要的物品和获得的物品。
-- 交易间隔支持秒、分、时和游戏日。
-- 容器页面使用两个独立的 4x3 区域：
-  - 左侧：购入物品
-  - 右侧：玩家提供的物品
-- 漏斗或管道可以从顶部及四面输入玩家提供的物品，并从底部输出购入物品。
-- 所属玩家在线或离线时都可以继续自动交易。
-- 玩家离线时根据 QShop 的 `playerdata/<uuid>.dat` 读取货币和限购信息；离线交易只检查货币、物品数量和限购次数，不重新判断 FTB 任务或 Stage 条件。
-- 支持 Action Bar 和聊天栏交易提示。
+## Full Description
 
-## 依赖
+QShop Requester is a QShop addon that reads shop entries and automatically completes selected purchases at a configured interval.
+
+### Features
+
+- Supports currency purchase and barter shop entries.
+- Search, filter, and select available QShop entries from the settings screen.
+- Displays prices, required items, and received items for selected entries.
+- Supports trade intervals in seconds, minutes, hours, and game days.
+- Uses two separate 4x3 container areas:
+  - Left side: purchased items
+  - Right side: player-supplied items
+- Hoppers and pipes can insert supplied items from the top and all four sides, and extract purchased items from the bottom.
+- Continues automatic trading while the owner is online or offline.
+- When the owner is offline, currency and purchase-limit data are read from QShop player data. Offline trading checks currency, item availability, and purchase limits without re-evaluating FTB quests or Stage requirements.
+- Supports Action Bar and chat notifications for completed or failed trades.
+
+### Dependencies
 
 - Minecraft Forge 1.20.1
-- QShop 1.1.0 或更高版本，且低于 2.0
+- QShop 1.1.0 or newer, below 2.0
 
-## 安装
+### Installation
 
-1. 安装 Minecraft Forge 1.20.1。
-2. 安装 QShop。
-3. 将 `qshop-requester` 的 jar 文件放入 `mods` 文件夹。
+1. Install Minecraft Forge 1.20.1.
+2. Install QShop.
+3. Place the `qshop-requester` jar file in the `mods` folder.
 
-## 许可证
+### License
 
-ARR（All Rights Reserved，保留所有权利）。未经作者许可，不得复制、修改、再发布或用于其他项目。
+ARR (All Rights Reserved). Redistribution, modification, or inclusion in another project requires permission from the author.

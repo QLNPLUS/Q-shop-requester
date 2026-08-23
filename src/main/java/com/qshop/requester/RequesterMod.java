@@ -11,7 +11,9 @@ import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.DistExecutor;
+import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.network.IContainerFactory;
 import net.minecraftforge.registries.DeferredRegister;
@@ -63,6 +65,8 @@ public final class RequesterMod {
         BLOCK_ENTITIES.register(bus);
         MENUS.register(bus);
         TABS.register(bus);
+        ModLoadingContext.get().registerConfig(
+                ModConfig.Type.COMMON, RequesterConfig.SPEC, "qshop_requester-common.toml");
         RequesterNetwork.init();
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
                 () -> () -> bus.addListener(RequesterClient::onClientSetup));

@@ -479,6 +479,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     @Override public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (keyCode == GLFW.GLFW_KEY_F8) {
+            if (!RequesterLayoutDebug.isConfiguredEnabled()) {
+                return super.keyPressed(keyCode, scanCode, modifiers);
+            }
             RequesterLayoutDebug.toggle();
             RequesterLayoutDebug.ensureSelected(tab);
             return true;

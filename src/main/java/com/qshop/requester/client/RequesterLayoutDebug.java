@@ -9,6 +9,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import com.qshop.requester.RequesterConfig;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -66,10 +67,11 @@ public final class RequesterLayoutDebug {
         load();
     }
 
-    public static boolean isConfiguredEnabled() { return true; }
-    public static boolean isEnabled() { return enabled; }
+    public static boolean isConfiguredEnabled() { return RequesterConfig.layoutDebugEnabled(); }
+    public static boolean isEnabled() { return enabled && isConfiguredEnabled(); }
 
     public static void toggle() {
+        if (!isConfiguredEnabled()) return;
         load();
         enabled = !enabled;
     }

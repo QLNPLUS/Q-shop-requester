@@ -9,6 +9,7 @@
 - Added an explicit block particle texture for the requester block.
 - Added EMI compatibility for the settings screen to prevent hidden EMI item areas from receiving hover and tooltip interactions.
 - Added a CurseForge link for the QShop dependency to the project description.
+- Added the `qshop_requester-common.toml` configuration file with the F8 layout debug mode disabled by default.
 
 ### Fixed
 

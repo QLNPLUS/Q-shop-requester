@@ -7,6 +7,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.level.block.SoundType;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.fml.common.Mod;
@@ -32,7 +34,11 @@ public final class RequesterMod {
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
     public static final RegistryObject<Block> REQUESTER = BLOCKS.register("requester",
-            () -> new RequesterBlock(Block.Properties.of().strength(2.5F).requiresCorrectToolForDrops()));
+            () -> new RequesterBlock(Block.Properties.of()
+                    .mapColor(MapColor.WOOD)
+                    .strength(2.5F, 2.5F)
+                    .sound(SoundType.WOOD)
+                    .requiresCorrectToolForDrops()));
     public static final RegistryObject<Item> REQUESTER_ITEM = ITEMS.register("requester",
             () -> new BlockItem(REQUESTER.get(), new Item.Properties()));
     public static final RegistryObject<BlockEntityType<RequesterBlockEntity>> REQUESTER_ENTITY =

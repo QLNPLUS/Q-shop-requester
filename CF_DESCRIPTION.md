@@ -25,12 +25,12 @@ QShop Requester is a QShop addon that reads shop entries and automatically compl
 ### Dependencies
 
 - Minecraft Forge 1.20.1
-- QShop 1.1.0 or newer, below 2.0
+- [QShop](https://www.curseforge.com/minecraft/mc-mods/q-shop) 1.1.0 or newer, below 2.0
 
 ### Installation
 
 1. Install Minecraft Forge 1.20.1.
-2. Install QShop.
+2. Install [QShop](https://www.curseforge.com/minecraft/mc-mods/q-shop).
 3. Place the `qshop-requester` jar file in the `mods` folder.
 
 ### License

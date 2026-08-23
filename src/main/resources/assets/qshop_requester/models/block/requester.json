@@ -3,6 +3,7 @@
   "textures": {
     "side": "qshop_requester:block/sell_box_side",
     "bottom": "qshop_requester:block/sell_box_bottom",
-    "top": "qshop_requester:block/sell_box_top"
+    "top": "qshop_requester:block/sell_box_top",
+    "particle": "qshop_requester:block/sell_box_side"
   }
 }

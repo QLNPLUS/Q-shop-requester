@@ -70,6 +70,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     @Override protected void init() {
         super.init();
+        RequesterEmiCompat.setSettingsScreen(tab == 1);
         RequesterLayoutDebug.beginScreen();
         targets = RequesterClient.targets();
         searchInput = new LayeredEditBox(font, leftPos + 10, topPos + 21, 156, 12,
@@ -400,6 +401,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     private void setTab(int next) {
         if (tab == 1 && next != 1) sendSettings();
         tab = next;
+        RequesterEmiCompat.setSettingsScreen(next == 1);
         dropdown = false;
         if (searchInput != null) {
             searchInput.setVisible(next == 1);
@@ -548,7 +550,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         super.renderTooltip(g, mx, my);
     }
 
-    @Override public void removed() { sendSettings(); super.removed(); }
+    @Override public void removed() {
+        RequesterEmiCompat.setSettingsScreen(false);
+        sendSettings();
+        super.removed();
+    }
 
     private void drawText(GuiGraphics g, Component text, int x, int y, int color) {
         g.drawString(font, text, leftPos + x, topPos + y, color, true);

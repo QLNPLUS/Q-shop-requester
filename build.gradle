@@ -7,7 +7,7 @@ plugins {
 
 
 group = 'com.qshop'
-version = '1.0.1'
+version = '1.1.0'
 base { archivesName = 'qshop-requester' }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
@@ -34,7 +34,7 @@ repositories {
 
 dependencies {
     minecraft 'net.minecraftforge:forge:1.20.1-47.4.20'
-    compileOnly fg.deobf(files('../Q-shop/build/libs/qshop-1.1.0.jar'))
+    compileOnly fg.deobf(files('../Q-shop/build/libs/qshop-1.2.2.jar'))
 }
 
 tasks.withType(JavaCompile).configureEach { it.options.encoding = 'UTF-8' }

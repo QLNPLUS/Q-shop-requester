@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.0] - 2026-08-26
+
+### Added
+
+- Changed requester target selection to show shops first and open the QShop interface for entry selection.
+- Added support for BUY, SELL, BARTER, and COMMAND entries in automatic trading.
+- Added online and offline handling for supplied items, currency balances, commands, and purchase limits.
+- Updated the requester integration to build against QShop 1.2.2.
+
 ## [1.0.1] - 2026-08-23
 
 ### Added

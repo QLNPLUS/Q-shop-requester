@@ -27,6 +27,6 @@ side="BOTH"
 [[dependencies.qshop_requester]]
 modId="qshop"
 mandatory=true
-versionRange="[1.1.0,2.0)"
+versionRange="[1.2.0,2.0)"
 ordering="AFTER"
 side="BOTH"

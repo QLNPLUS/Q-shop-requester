@@ -44,6 +44,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     private boolean dropdown;
     private int targetPage;
     private IntervalUnit intervalUnit = IntervalUnit.SECONDS;
+    private List<RequesterNetwork.ShopInfo> shops = List.of();
     private List<RequesterNetwork.TargetInfo> targets = List.of();
     private LayeredEditBox searchInput;
     private LayeredEditBox intervalInput;
@@ -72,6 +73,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         super.init();
         RequesterEmiCompat.setSettingsScreen(tab == 1);
         RequesterLayoutDebug.beginScreen();
+        shops = RequesterClient.shops();
         targets = RequesterClient.targets();
         searchInput = new LayeredEditBox(font, leftPos + 10, topPos + 21, 156, 12,
                 Component.translatable("qshop_requester.target.search"));
@@ -97,6 +99,13 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (intervalInput != null) intervalInput.setValue(Long.toString(intervalUnit.fromTicks(menu.intervalTicks())));
     }
 
+    public void refreshTargets(List<RequesterNetwork.ShopInfo> refreshedShops,
+                               List<RequesterNetwork.TargetInfo> refreshedTargets) {
+        shops = refreshedShops == null ? List.of() : List.copyOf(refreshedShops);
+        targets = refreshedTargets == null ? List.of() : List.copyOf(refreshedTargets);
+        targetPage = 0;
+    }
+
     public void refreshTargets(List<RequesterNetwork.TargetInfo> refreshed) {
         targets = refreshed == null ? List.of() : List.copyOf(refreshed);
         targetPage = 0;
@@ -104,7 +113,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     private void refreshSearchDropdown() {
         targetPage = 0;
-        dropdown = tab == 1 && searchInput != null && !filteredTargets().isEmpty();
+        dropdown = tab == 1 && searchInput != null && !filteredShops().isEmpty();
     }
 
     @Override protected void renderBg(GuiGraphics g, float partial, int mx, int my) {
@@ -223,7 +232,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         int bx = screenX(RequesterLayoutDebug.Widget.TARGET_BUTTON, 8);
         int by = screenY(RequesterLayoutDebug.Widget.TARGET_BUTTON, 34);
         RequesterTextures.button(g, bx, by, MAX_BUTTON_W, BUTTON_H,
-                inside(mx, my, bx, by, MAX_BUTTON_W, BUTTON_H), !filteredTargets().isEmpty());
+                inside(mx, my, bx, by, MAX_BUTTON_W, BUTTON_H), !filteredShops().isEmpty());
         drawCentered(g, selectedLabel(),
                 layoutX(RequesterLayoutDebug.Widget.TARGET_BUTTON, 8 + MAX_BUTTON_W / 2),
                 layoutY(RequesterLayoutDebug.Widget.TARGET_BUTTON, 38), WHITE, 148);
@@ -238,13 +247,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             int infoY = screenY(RequesterLayoutDebug.Widget.SELECTED_INFO, 51);
             g.renderItem(selected.display, infoX, infoY);
             drawScrollingText(g, selected.label, infoX + 22, infoY + 3, 138);
-            if (selected.type == com.qshop.shop.ShopEntryType.BUY) {
-                drawScrollingText(g, formatPrice(selected), infoX + 22, infoY + 17, 138);
-            } else {
-                drawScrollingText(g, Component.translatable("qshop_requester.need").getString()
-                        + stacksLabel(selected.give), infoX + 22, infoY + 17, 138);
-                drawScrollingText(g, Component.translatable("qshop_requester.receive").getString()
-                        + stacksLabel(selected.receive), infoX + 22, infoY + 31, 138);
+            List<String> details = targetDetails(selected);
+            for (int i = 0; i < details.size() && i < 3; i++) {
+                drawScrollingText(g, details.get(i), infoX + 22, infoY + 17 + i * 14, 138);
             }
         }
 
@@ -278,22 +283,41 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         drawText(g, Component.translatable("qshop_requester.target.dropdown"),
                 x - leftPos + 5, y - topPos + 4, WHITE);
         int start = targetPage * 4;
-        List<RequesterNetwork.TargetInfo> visibleTargets = filteredTargets();
-        for (int i = 0; i < Math.min(4, visibleTargets.size() - start); i++) {
-            RequesterNetwork.TargetInfo target = visibleTargets.get(start + i);
+        List<RequesterNetwork.ShopInfo> visibleShops = filteredShops();
+        for (int i = 0; i < Math.min(4, visibleShops.size() - start); i++) {
+            RequesterNetwork.ShopInfo shop = visibleShops.get(start + i);
             int rowY = y + 18 + i * 18;
             boolean hovered = inside(mx, my, x + 2, rowY, 156, 18);
             if (hovered) RequesterTextures.entryHighlight(g, x, rowY);
-            g.renderItem(target.display, x + 4, rowY + 1);
-            drawScrollingText(g, targetText(target), x + 23, rowY + 5, 131);
+            g.renderItem(shop.icon, x + 4, rowY + 1);
+            drawScrollingText(g, shop.shopName, x + 23, rowY + 5, 131);
         }
     }
 
     private String targetText(RequesterNetwork.TargetInfo target) {
         String prefix = target.shopName + " / " + target.label;
-        return target.type == com.qshop.shop.ShopEntryType.BARTER
-                ? prefix + " | " + Component.translatable("qshop_requester.need").getString()
-                + stacksLabel(target.give) : prefix + " | " + formatPrice(target);
+        return prefix + " | " + String.join(" | ", targetDetails(target));
+    }
+
+    private List<String> targetDetails(RequesterNetwork.TargetInfo target) {
+        return switch (target.type) {
+            case BUY -> List.of(Component.translatable("qshop_requester.entry.buy").getString()
+                    + ": " + formatPrice(target));
+            case SELL -> List.of(Component.translatable("qshop_requester.entry.sell").getString()
+                    + ": " + formatPrice(target),
+                    Component.translatable("qshop_requester.need").getString()
+                            + stacksLabel(target.give));
+            case BARTER -> List.of(Component.translatable("qshop_requester.need").getString()
+                            + stacksLabel(target.give),
+                    Component.translatable("qshop_requester.receive").getString()
+                            + stacksLabel(target.receive));
+            case COMMAND -> target.give.isEmpty() && target.receive.isEmpty()
+                    ? List.of(target.price > 0 ? formatPrice(target)
+                            : Component.translatable("qshop_requester.entry.command").getString())
+                    : List.of(Component.translatable("qshop_requester.need").getString()
+                            + stacksLabel(target.give),
+                    Component.translatable("qshop_requester.entry.command").getString());
+        };
     }
 
     private String stacksLabel(List<ItemStack> stacks) {
@@ -353,6 +377,13 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         }).toList();
     }
 
+    private List<RequesterNetwork.ShopInfo> filteredShops() {
+        if (searchInput == null || searchInput.getValue().isBlank()) return shops;
+        String query = searchInput.getValue().trim().toLowerCase(Locale.ROOT);
+        return shops.stream().filter(shop -> (shop.shopName + " " + shop.shopId)
+                .toLowerCase(Locale.ROOT).contains(query)).toList();
+    }
+
     private String selectedLabel() {
         RequesterNetwork.TargetInfo selected = selectedTarget();
         return selected == null ? Component.translatable("qshop_requester.target.choose").getString()
@@ -372,6 +403,18 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         RequesterNetwork.TargetInfo target = visibleTargets.get(index);
         menu.setSettings(menu.intervalTicks(), menu.actionBar(), menu.chat(), menu.enabled(),
                 target.shopId, target.tabIndex, target.entryIndex);
+        sendSettings();
+    }
+
+    private void chooseShop(int index) {
+        List<RequesterNetwork.ShopInfo> visibleShops = filteredShops();
+        if (index < 0 || index >= visibleShops.size()) return;
+        RequesterClient.beginShopSelection(this, visibleShops.get(index).shopId);
+    }
+
+    public void selectTargetFromShop(String shopId, int tabIndex, int entryIndex) {
+        menu.setSettings(menu.intervalTicks(), menu.actionBar(), menu.chat(), menu.enabled(),
+                shopId, tabIndex, entryIndex);
         sendSettings();
     }
 
@@ -437,10 +480,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 int x = screenX(RequesterLayoutDebug.Widget.TARGET_BUTTON, 8);
                 int y = screenY(RequesterLayoutDebug.Widget.TARGET_BUTTON, 35);
                 int start = targetPage * 4;
-                List<RequesterNetwork.TargetInfo> visibleTargets = filteredTargets();
-                for (int i = 0; i < Math.min(4, visibleTargets.size() - start); i++) {
+                List<RequesterNetwork.ShopInfo> visibleShops = filteredShops();
+                for (int i = 0; i < Math.min(4, visibleShops.size() - start); i++) {
                     if (inside(mx, my, x + 2, y + 18 + i * 18, 156, 18)) {
-                        chooseTarget(start + i); dropdown = false; return true;
+                        chooseShop(start + i); dropdown = false; return true;
                     }
                 }
                 dropdown = false; return true;
@@ -450,7 +493,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             if (inside(mx, my, targetX, targetY, MAX_BUTTON_W, BUTTON_H)) {
                 if (searchInput != null) searchInput.setFocused(false);
                 if (intervalInput != null) intervalInput.setFocused(false);
-                dropdown = !filteredTargets().isEmpty(); targetPage = 0; return true;
+                dropdown = !filteredShops().isEmpty(); targetPage = 0; return true;
             }
             Component unit = Component.translatable(intervalUnit.key);
             int unitW = buttonWidth(unit, 20, 64);
@@ -530,8 +573,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     }
 
     @Override public boolean mouseScrolled(double mx, double my, double delta) {
-        if (tab == 1 && dropdown && filteredTargets().size() > 4) {
-            int maxPage = (filteredTargets().size() - 1) / 4;
+        if (tab == 1 && dropdown && filteredShops().size() > 4) {
+            int maxPage = (filteredShops().size() - 1) / 4;
             targetPage = Mth.clamp(targetPage + (delta < 0 ? 1 : -1), 0, maxPage);
             return true;
         }

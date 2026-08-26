@@ -3,14 +3,22 @@ package com.qshop.requester;
 import com.qshop.api.CurrencyService;
 import com.qshop.api.QShopAddonApi;
 import com.qshop.api.TradeResult;
+import com.qshop.currency.CurrencyRegistry;
 import com.qshop.data.QShopSavedData;
+import com.qshop.kubejs.QShopTradeEvents;
 import com.qshop.shop.Shop;
+import com.qshop.shop.ShopCommand;
 import com.qshop.shop.ShopEntry;
 import com.qshop.shop.ShopEntryType;
 import com.qshop.shop.ShopManager;
+import com.qshop.trade.RequirementCheck;
+import com.qshop.wallet.IWallet;
+import com.qshop.wallet.WalletCapability;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -31,7 +39,6 @@ import java.util.UUID;
 public final class RequesterService {
     public static final ResourceLocation SOURCE = ResourceLocation.fromNamespaceAndPath(
             RequesterMod.MODID, "auto_request");
-    // One configured interval performs one shop transaction unit.
     private static final int UNITS_PER_CYCLE = 1;
     private static final String FORGE_CAPS_KEY = "ForgeCaps";
     private static final String WALLET_CAPABILITY_KEY = "qshop:wallet";
@@ -55,11 +62,29 @@ public final class RequesterService {
             notifyFailure(box, owner, "qshop_requester.message.no_target");
             return;
         }
-        TradeResult result = box.selectedType() == ShopEntryType.BARTER
-                ? QShopAddonApi.barter(owner, box.supplied(), box.purchased(), box.shopId(),
-                box.tabIndex(), box.entryIndex(), UNITS_PER_CYCLE, SOURCE, box.getBlockPos())
-                : QShopAddonApi.buy(owner, box.purchased(), box.shopId(), box.tabIndex(),
-                box.entryIndex(), UNITS_PER_CYCLE, SOURCE, box.getBlockPos());
+        MinecraftServer server = owner.getServer();
+        Shop shop = ShopManager.get(box.shopId());
+        ShopEntry entry = findEntry(shop, box.tabIndex(), box.entryIndex());
+        if (entry == null || !validEntry(entry) || !RequirementCheck.satisfied(owner, entry)) {
+            notifyFailure(box, owner, TradeResult.Status.UNSUPPORTED_ENTRY.name());
+            return;
+        }
+
+        TradeResult result;
+        if (entry.commands.isEmpty() && entry.type != ShopEntryType.COMMAND) {
+            result = switch (entry.type) {
+                case BUY -> QShopAddonApi.buy(owner, box.purchased(), box.shopId(), box.tabIndex(),
+                        box.entryIndex(), UNITS_PER_CYCLE, SOURCE, box.getBlockPos());
+                case SELL -> QShopAddonApi.sell(owner, box.supplied(), box.shopId(), box.tabIndex(),
+                        box.entryIndex(), UNITS_PER_CYCLE, SOURCE, box.getBlockPos());
+                case BARTER -> QShopAddonApi.barter(owner, box.supplied(), box.purchased(), box.shopId(),
+                        box.tabIndex(), box.entryIndex(), UNITS_PER_CYCLE, SOURCE, box.getBlockPos());
+                case COMMAND -> failure(TradeResult.Status.UNSUPPORTED_ENTRY);
+            };
+        } else {
+            result = tradeWithHandlers(box, server, owner, owner.getUUID(), shop, entry,
+                    box.tabIndex(), box.entryIndex());
+        }
         if (result.isSuccess()) notifySuccess(box, owner, result.getTotalItems());
         else notifyFailure(box, owner, result.getStatus().name());
     }
@@ -67,168 +92,304 @@ public final class RequesterService {
     private static TradeResult tradeOffline(RequesterBlockEntity box, MinecraftServer server, UUID owner) {
         if (box.shopId().isBlank()) return failure(TradeResult.Status.INVALID_ARGUMENT);
         Shop shop = ShopManager.get(box.shopId());
-        if (shop == null) return failure(TradeResult.Status.SHOP_NOT_FOUND);
-        shop.ensureTabs();
-        if (box.tabIndex() < 0 || box.tabIndex() >= shop.tabs.size()) {
-            return failure(TradeResult.Status.TAB_NOT_FOUND);
+        ShopEntry entry = findEntry(shop, box.tabIndex(), box.entryIndex());
+        if (entry == null) {
+            return shop == null ? failure(TradeResult.Status.SHOP_NOT_FOUND)
+                    : failure(box.tabIndex() < 0 || box.tabIndex() >= shop.tabs.size()
+                    ? TradeResult.Status.TAB_NOT_FOUND : TradeResult.Status.ENTRY_NOT_FOUND);
         }
-        var entries = shop.tabs.get(box.tabIndex()).entries;
-        if (box.entryIndex() < 0 || box.entryIndex() >= entries.size()) {
-            return failure(TradeResult.Status.ENTRY_NOT_FOUND);
-        }
-        ShopEntry entry = entries.get(box.entryIndex());
         if (!validEntry(entry)) return failure(TradeResult.Status.UNSUPPORTED_ENTRY);
+        return tradeWithHandlers(box, server, null, owner, shop, entry,
+                box.tabIndex(), box.entryIndex());
+    }
 
-        String key = limitKey(shop, box.tabIndex(), box.entryIndex(), entry);
+    private static ShopEntry findEntry(Shop shop, int tabIndex, int entryIndex) {
+        if (shop == null) return null;
+        shop.ensureTabs();
+        if (tabIndex < 0 || tabIndex >= shop.tabs.size()) return null;
+        List<ShopEntry> entries = shop.tabs.get(tabIndex).entries;
+        return entryIndex >= 0 && entryIndex < entries.size() ? entries.get(entryIndex) : null;
+    }
+
+    private static TradeResult tradeWithHandlers(RequesterBlockEntity box, MinecraftServer server,
+                                                  ServerPlayer onlineOwner, UUID owner, Shop shop,
+                                                  ShopEntry entry, int tabIndex, int entryIndex) {
+        String key = limitKey(shop, tabIndex, entryIndex, entry);
         String period = entry.reset.periodKey();
         int units = availableUnits(server, owner, entry, key, period);
         if (units <= 0) return failure(TradeResult.Status.LIMIT_REACHED);
-        return entry.type == ShopEntryType.BARTER
-                ? tradeOfflineBarter(box, server, owner, entry, key, period, units)
-                : tradeOfflineBuy(box, server, owner, entry, key, period, units);
+        if (onlineOwner != null && !QShopTradeEvents.postBefore(onlineOwner, shop,
+                tabIndex, entryIndex, entry, UNITS_PER_CYCLE)) {
+            return failure(TradeResult.Status.CANCELLED);
+        }
+
+        List<ItemStack> purchasedSnapshot = snapshot(box.purchased());
+        List<ItemStack> suppliedSnapshot = snapshot(box.supplied());
+        int itemsPerUnit = itemsPerUnit(entry);
+        double pricePerUnit = effectivePrice(entry);
+        double oldBalance = pricePerUnit > 0
+                ? balance(server, onlineOwner, owner, entry.currencyId) : 0D;
+
+        switch (entry.type) {
+            case BUY -> {
+                units = limitByBalance(server, onlineOwner, owner, entry.currencyId,
+                        pricePerUnit, units);
+                units = Math.min(units, capacityUnits(box.purchased(), entry.item, units));
+                if (units <= 0) return failure(pricePerUnit > 0
+                        ? TradeResult.Status.NOT_ENOUGH_CURRENCY : TradeResult.Status.NO_SPACE);
+                if (!withdraw(server, onlineOwner, owner, entry.currencyId,
+                        pricePerUnit * units, box.getBlockPos())) {
+                    return failure(TradeResult.Status.NOT_ENOUGH_CURRENCY);
+                }
+                ItemStack output = entry.item.copy();
+                output.setCount(entry.item.getCount() * units);
+                if (insertItems(box.purchased(), output) != output.getCount()) {
+                    restore(box.purchased(), purchasedSnapshot);
+                    restoreCurrency(server, onlineOwner, owner, entry, oldBalance);
+                    return failure(TradeResult.Status.FAILED);
+                }
+            }
+            case SELL -> {
+                units = Math.min(units, countItems(box.supplied(), entry.item) / entry.item.getCount());
+                if (units <= 0) return failure(TradeResult.Status.NOT_ENOUGH_ITEMS);
+                if (!extractItems(box.supplied(), entry.item, entry.item.getCount() * units)) {
+                    restore(box.supplied(), suppliedSnapshot);
+                    return failure(TradeResult.Status.FAILED);
+                }
+                if (!deposit(server, onlineOwner, owner, entry.currencyId,
+                        pricePerUnit * units, box.getBlockPos())) {
+                    restore(box.supplied(), suppliedSnapshot);
+                    return failure(TradeResult.Status.FAILED);
+                }
+            }
+            case BARTER -> {
+                for (ItemStack give : entry.give) {
+                    units = Math.min(units, countItems(box.supplied(), give) / give.getCount());
+                }
+                for (ItemStack receive : entry.receive) {
+                    units = Math.min(units, capacityUnits(box.purchased(), receive, units));
+                }
+                units = limitByBalance(server, onlineOwner, owner, entry.currencyId,
+                        pricePerUnit, units);
+                if (units <= 0) return failure(pricePerUnit > 0
+                        ? TradeResult.Status.NOT_ENOUGH_CURRENCY : TradeResult.Status.NOT_ENOUGH_ITEMS);
+                if (!withdraw(server, onlineOwner, owner, entry.currencyId,
+                        pricePerUnit * units, box.getBlockPos())) {
+                    return failure(TradeResult.Status.NOT_ENOUGH_CURRENCY);
+                }
+                if (!exchangeItems(box, entry, units)) {
+                    restore(box.purchased(), purchasedSnapshot);
+                    restore(box.supplied(), suppliedSnapshot);
+                    restoreCurrency(server, onlineOwner, owner, entry, oldBalance);
+                    return failure(TradeResult.Status.FAILED);
+                }
+            }
+            case COMMAND -> {
+                if (!entry.item.isEmpty()) {
+                    units = Math.min(units, countItems(box.supplied(), entry.item) / entry.item.getCount());
+                    if (units <= 0) return failure(TradeResult.Status.NOT_ENOUGH_ITEMS);
+                    if (!extractItems(box.supplied(), entry.item, entry.item.getCount() * units)) {
+                        restore(box.supplied(), suppliedSnapshot);
+                        return failure(TradeResult.Status.FAILED);
+                    }
+                } else {
+                    units = limitByBalance(server, onlineOwner, owner, entry.currencyId,
+                            pricePerUnit, units);
+                    if (units <= 0) return failure(TradeResult.Status.NOT_ENOUGH_CURRENCY);
+                    if (!withdraw(server, onlineOwner, owner, entry.currencyId,
+                            pricePerUnit * units, box.getBlockPos())) {
+                        return failure(TradeResult.Status.NOT_ENOUGH_CURRENCY);
+                    }
+                }
+            }
+        }
+
+        if (!finishTrade(server, onlineOwner, owner, entry, key, period, units)) {
+            restore(box.purchased(), purchasedSnapshot);
+            restore(box.supplied(), suppliedSnapshot);
+            restoreCurrency(server, onlineOwner, owner, entry, oldBalance);
+            return failure(TradeResult.Status.FAILED);
+        }
+        if (!entry.commands.isEmpty()) {
+            executeCommands(server, onlineOwner, owner, shop, entryIndex, entry, units);
+        }
+        if (onlineOwner != null) {
+            QShopTradeEvents.postAfter(onlineOwner, shop, tabIndex, entryIndex, entry, units,
+                    itemsPerUnit * units, units < UNITS_PER_CYCLE);
+        }
+        return TradeResult.success(UNITS_PER_CYCLE, units, itemsPerUnit * units,
+                pricePerUnit * units);
+    }
+
+    private static boolean exchangeItems(RequesterBlockEntity box, ShopEntry entry, int units) {
+        for (ItemStack give : entry.give) {
+            if (!extractItems(box.supplied(), give, give.getCount() * units)) return false;
+        }
+        for (ItemStack receive : entry.receive) {
+            ItemStack result = receive.copy();
+            result.setCount(receive.getCount() * units);
+            if (insertItems(box.purchased(), result) != result.getCount()) return false;
+        }
+        return true;
     }
 
     private static int availableUnits(MinecraftServer server, UUID owner, ShopEntry entry,
                                       String key, String period) {
         int units = UNITS_PER_CYCLE;
         if (entry.globalLimit > 0) {
-            int used = QShopSavedData.get(server).globalCounts.getCount(key, period);
-            units = Math.min(units, Math.max(0, entry.globalLimit - used));
+            units = Math.min(units, Math.max(0,
+                    entry.globalLimit - QShopSavedData.get(server).globalCounts.getCount(key, period)));
         }
         if (entry.playerLimit > 0) {
-            int used = CurrencyService.INSTANCE.getLimitCount(server, owner, key, period);
-            units = Math.min(units, Math.max(0, entry.playerLimit - used));
+            units = Math.min(units, Math.max(0,
+                    entry.playerLimit - CurrencyService.INSTANCE.getLimitCount(server, owner, key, period)));
         }
         return units;
     }
 
-    private static TradeResult tradeOfflineBuy(RequesterBlockEntity box, MinecraftServer server,
-                                               UUID owner, ShopEntry entry, String key,
-                                               String period, int units) {
-        List<ItemStack> purchasedSnapshot = snapshot(box.purchased());
-        int itemsPerUnit = entry.item.getCount();
-        long byBalance = entry.price > 0
-                ? (long) (CurrencyService.INSTANCE.getBalance(server, owner, entry.currencyId) / entry.price)
-                : Integer.MAX_VALUE;
-        units = (int) Math.min(units, Math.min(byBalance, Integer.MAX_VALUE));
-        units = Math.min(units, capacityUnits(box.purchased(), entry.item, units));
-        if (units <= 0) {
-            return failure(entry.price > 0
-                    ? TradeResult.Status.NOT_ENOUGH_CURRENCY : TradeResult.Status.NO_SPACE);
-        }
-
-        int totalItems = itemsPerUnit * units;
-        double oldBalance = entry.price > 0
-                ? CurrencyService.INSTANCE.getBalance(server, owner, entry.currencyId) : 0D;
-        double totalPrice = entry.price * units;
-        if (totalPrice > 0 && !CurrencyService.INSTANCE.withdraw(server, owner, entry.currencyId,
-                totalPrice, SOURCE, box.getBlockPos(), false)) {
-            return failure(TradeResult.Status.NOT_ENOUGH_CURRENCY);
-        }
-        ItemStack output = entry.item.copy();
-        output.setCount(totalItems);
-        int inserted = insertItems(box.purchased(), output);
-        if (inserted != totalItems) {
-            restore(box.purchased(), purchasedSnapshot);
-            refund(server, owner, entry, oldBalance, box.getBlockPos());
-            return failure(TradeResult.Status.FAILED);
-        }
-        return finishOfflineTrade(box, server, owner, entry, key, period, units, totalItems,
-                totalPrice, oldBalance, purchasedSnapshot, null);
+    private static int limitByBalance(MinecraftServer server, ServerPlayer onlineOwner, UUID owner,
+                                      String currency, double price, int units) {
+        if (price <= 0) return units;
+        long available = (long) (balance(server, onlineOwner, owner, currency) / price);
+        return (int) Math.min(units, Math.min(available, Integer.MAX_VALUE));
     }
 
-    private static TradeResult tradeOfflineBarter(RequesterBlockEntity box, MinecraftServer server,
-                                                  UUID owner, ShopEntry entry, String key,
-                                                  String period, int units) {
-        List<ItemStack> purchasedSnapshot = snapshot(box.purchased());
-        List<ItemStack> suppliedSnapshot = snapshot(box.supplied());
-        for (ItemStack give : entry.give) {
-            units = Math.min(units, countItems(box.supplied(), give) / give.getCount());
-        }
-        for (ItemStack receive : entry.receive) {
-            units = Math.min(units, capacityUnits(box.purchased(), receive, units));
-        }
-        long byBalance = entry.price > 0
-                ? (long) (CurrencyService.INSTANCE.getBalance(server, owner, entry.currencyId) / entry.price)
-                : Integer.MAX_VALUE;
-        units = (int) Math.min(units, Math.min(byBalance, Integer.MAX_VALUE));
-        if (units <= 0) {
-            return failure(entry.price > 0
-                    ? TradeResult.Status.NOT_ENOUGH_CURRENCY : TradeResult.Status.NOT_ENOUGH_ITEMS);
-        }
-
-        double totalPrice = entry.price * units;
-        double oldBalance = entry.price > 0
-                ? CurrencyService.INSTANCE.getBalance(server, owner, entry.currencyId) : 0D;
-        if (totalPrice > 0 && !CurrencyService.INSTANCE.withdraw(server, owner, entry.currencyId,
-                totalPrice, SOURCE, box.getBlockPos(), false)) {
-            return failure(TradeResult.Status.NOT_ENOUGH_CURRENCY);
-        }
-
-        for (ItemStack give : entry.give) {
-            int amount = give.getCount() * units;
-            if (!extractItems(box.supplied(), give, amount)) {
-                restore(box.purchased(), purchasedSnapshot);
-                restore(box.supplied(), suppliedSnapshot);
-                refund(server, owner, entry, oldBalance, box.getBlockPos());
-                return failure(TradeResult.Status.FAILED);
+    private static boolean finishTrade(MinecraftServer server, ServerPlayer onlineOwner, UUID owner,
+                                       ShopEntry entry, String key, String period, int units) {
+        if (entry.playerLimit > 0) {
+            if (onlineOwner != null) {
+                IWallet wallet = WalletCapability.get(onlineOwner);
+                if (wallet == null) return false;
+                wallet.addLimitCount(key, units, period);
+            } else if (!addOfflineLimit(server, owner, key, period, units)) {
+                return false;
             }
-        }
-
-        for (ItemStack receive : entry.receive) {
-            int amount = receive.getCount() * units;
-            ItemStack result = receive.copy();
-            result.setCount(amount);
-            int count = insertItems(box.purchased(), result);
-            if (count != amount) {
-                restore(box.purchased(), purchasedSnapshot);
-                restore(box.supplied(), suppliedSnapshot);
-                refund(server, owner, entry, oldBalance, box.getBlockPos());
-                return failure(TradeResult.Status.FAILED);
-            }
-        }
-
-        int tradedUnits = units;
-        int totalItems = entry.receive.stream().mapToInt(s -> s.getCount() * tradedUnits).sum();
-        return finishOfflineTrade(box, server, owner, entry, key, period, units, totalItems,
-                totalPrice, oldBalance, purchasedSnapshot, suppliedSnapshot);
-    }
-
-    private static TradeResult finishOfflineTrade(RequesterBlockEntity box, MinecraftServer server,
-                                                  UUID owner, ShopEntry entry, String key,
-                                                  String period, int units, int totalItems,
-                                                  double totalPrice, double oldBalance,
-                                                  List<ItemStack> purchasedSnapshot,
-                                                  List<ItemStack> suppliedSnapshot) {
-        if (entry.playerLimit > 0 && !addOfflineLimit(server, owner, key, period, units)) {
-            restore(box.purchased(), purchasedSnapshot);
-            if (suppliedSnapshot != null) restore(box.supplied(), suppliedSnapshot);
-            refund(server, owner, entry, oldBalance, box.getBlockPos());
-            return failure(TradeResult.Status.FAILED);
         }
         if (entry.globalLimit > 0) {
             QShopSavedData data = QShopSavedData.get(server);
             data.globalCounts.addCount(key, units, period);
             data.setDirty();
         }
-        return TradeResult.success(units, units, totalItems, totalPrice);
+        return true;
+    }
+
+    private static void executeCommands(MinecraftServer server, ServerPlayer onlineOwner, UUID owner,
+                                        Shop shop, int entryIndex, ShopEntry entry, int units) {
+        String playerName = onlineOwner == null
+                ? server.getProfileCache().get(owner).map(profile -> profile.getName()).orElse(owner.toString())
+                : onlineOwner.getGameProfile().getName();
+        int commandRuns = entry.type == ShopEntryType.COMMAND ? units : 1;
+        int commandUnits = entry.type == ShopEntryType.COMMAND ? 1 : units;
+        int commandItems = entry.type == ShopEntryType.COMMAND
+                ? itemsPerUnit(entry) : itemsPerUnit(entry) * units;
+        String commandPrice = CurrencyRegistry.format(entry.type == ShopEntryType.COMMAND
+                ? entry.price : entry.price * units);
+        for (int run = 0; run < commandRuns; run++) {
+            for (ShopCommand command : entry.commands) {
+                if (command.command == null || command.command.isBlank()) continue;
+                String text = command.command
+                        .replace("%player%", playerName)
+                        .replace("%player_uuid%", owner.toString())
+                        .replace("%shop%", shop.id)
+                        .replace("%shop_uuid%", shop.uuid == null ? "" : shop.uuid.toString())
+                        .replace("%entry%", String.valueOf(entryIndex))
+                        .replace("%units%", String.valueOf(commandUnits))
+                        .replace("%items%", String.valueOf(commandItems))
+                        .replace("%price%", commandPrice)
+                        .replace("%currency%", entry.currencyId == null ? "" : entry.currencyId)
+                        .replace("%multiplier%", String.valueOf(commandUnits));
+                try {
+                    CommandSourceStack source = onlineOwner == null
+                            ? server.createCommandSourceStack().withPermission(command.op ? 4 : 0)
+                            : new CommandSourceStack(onlineOwner, onlineOwner.position(),
+                            onlineOwner.getRotationVector(), onlineOwner.serverLevel(),
+                            command.op ? 4 : 0, playerName, onlineOwner.getDisplayName(), server, onlineOwner);
+                    if (command.silent) source = source.withSuppressedOutput();
+                    server.getCommands().performPrefixedCommand(source, text);
+                } catch (RuntimeException ignored) {
+                    // Match Q-shop: a failed reward command does not roll back the trade.
+                }
+            }
+        }
     }
 
     private static boolean validEntry(ShopEntry entry) {
-        if ((entry.type != ShopEntryType.BUY && entry.type != ShopEntryType.BARTER)
-                || !entry.commands.isEmpty() || !Double.isFinite(entry.price) || entry.price < 0
-                || (entry.price > 0 && (entry.currencyId == null || entry.currencyId.isBlank()))) {
+        if (entry == null || !Double.isFinite(entry.price) || entry.price < 0) {
             return false;
         }
-        if (entry.type == ShopEntryType.BUY) return !entry.item.isEmpty() && entry.item.getCount() > 0;
-        return !entry.give.isEmpty() && !entry.receive.isEmpty()
-                && entry.give.stream().allMatch(s -> !s.isEmpty() && s.getCount() > 0)
-                && entry.receive.stream().allMatch(s -> !s.isEmpty() && s.getCount() > 0);
+        boolean usesCurrency = entry.type == ShopEntryType.BUY
+                || entry.type == ShopEntryType.SELL
+                || entry.type == ShopEntryType.BARTER
+                || (entry.type == ShopEntryType.COMMAND && entry.item.isEmpty());
+        if (usesCurrency && entry.price > 0
+                && (entry.currencyId == null || entry.currencyId.isBlank())) return false;
+        return switch (entry.type) {
+            case BUY, SELL -> !entry.item.isEmpty() && entry.item.getCount() > 0;
+            case BARTER -> validStacks(entry.give) && validStacks(entry.receive);
+            case COMMAND -> !entry.commands.isEmpty() || !entry.item.isEmpty() || entry.price > 0;
+        };
+    }
+
+    private static boolean validStacks(List<ItemStack> stacks) {
+        return stacks != null && !stacks.isEmpty()
+                && stacks.stream().allMatch(stack -> stack != null && !stack.isEmpty()
+                && stack.getCount() > 0);
+    }
+
+    private static double effectivePrice(ShopEntry entry) {
+        return entry.type == ShopEntryType.COMMAND && !entry.item.isEmpty() ? 0D : entry.price;
+    }
+
+    private static int itemsPerUnit(ShopEntry entry) {
+        return switch (entry.type) {
+            case BARTER -> entry.receive.stream().mapToInt(ItemStack::getCount).sum();
+            case COMMAND -> entry.item.isEmpty() ? 1 : entry.item.getCount();
+            default -> entry.item.getCount();
+        };
     }
 
     private static String limitKey(Shop shop, int tabIndex, int entryIndex, ShopEntry entry) {
         return entry.uuid != null && !entry.uuid.isEmpty()
                 ? shop.id + "|" + entry.uuid : shop.id + "|" + tabIndex + "|" + entryIndex;
+    }
+
+    private static double balance(MinecraftServer server, ServerPlayer onlineOwner, UUID owner,
+                                  String currency) {
+        return onlineOwner != null ? CurrencyService.INSTANCE.getBalance(onlineOwner, currency)
+                : CurrencyService.INSTANCE.getBalance(server, owner, currency);
+    }
+
+    private static boolean withdraw(MinecraftServer server, ServerPlayer onlineOwner, UUID owner,
+                                    String currency, double amount, BlockPos pos) {
+        if (amount <= 0) return true;
+        return onlineOwner != null
+                ? CurrencyService.INSTANCE.withdraw(onlineOwner, currency, amount, SOURCE, pos, false)
+                : CurrencyService.INSTANCE.withdraw(server, owner, currency, amount, SOURCE, pos, false);
+    }
+
+    private static boolean deposit(MinecraftServer server, ServerPlayer onlineOwner, UUID owner,
+                                   String currency, double amount, BlockPos pos) {
+        if (amount <= 0) return true;
+        double before = balance(server, onlineOwner, owner, currency);
+        double after;
+        if (onlineOwner != null) {
+            after = CurrencyService.INSTANCE.deposit(onlineOwner, currency, amount, SOURCE, pos, false);
+        } else {
+            after = CurrencyService.INSTANCE.deposit(server, owner, currency, amount, SOURCE, pos, false);
+        }
+        return after >= before + amount;
+    }
+
+    private static void restoreCurrency(MinecraftServer server, ServerPlayer onlineOwner, UUID owner,
+                                         ShopEntry entry, double oldBalance) {
+        if (effectivePrice(entry) <= 0) return;
+        if (onlineOwner != null) {
+            CurrencyService.INSTANCE.set(onlineOwner, entry.currencyId, oldBalance, SOURCE,
+                    null, false);
+        } else {
+            CurrencyService.INSTANCE.set(server, owner, entry.currencyId, oldBalance, SOURCE,
+                    null, false);
+        }
     }
 
     private static int capacityUnits(IItemHandler handler, ItemStack prototype, int maxUnits) {
@@ -285,9 +446,7 @@ public final class RequesterService {
 
     private static List<ItemStack> snapshot(ItemStackHandler handler) {
         List<ItemStack> snapshot = new ArrayList<>(handler.getSlots());
-        for (int slot = 0; slot < handler.getSlots(); slot++) {
-            snapshot.add(handler.getStackInSlot(slot).copy());
-        }
+        for (int slot = 0; slot < handler.getSlots(); slot++) snapshot.add(handler.getStackInSlot(slot).copy());
         return snapshot;
     }
 
@@ -307,13 +466,6 @@ public final class RequesterService {
             remaining -= extracted.getCount();
         }
         return remaining == 0;
-    }
-
-    private static void refund(MinecraftServer server, UUID owner, ShopEntry entry,
-                               double balance, BlockPos pos) {
-        if (entry.price > 0) {
-            CurrencyService.INSTANCE.set(server, owner, entry.currencyId, balance, SOURCE, pos, false);
-        }
     }
 
     private static boolean addOfflineLimit(MinecraftServer server, UUID owner, String key,
@@ -355,15 +507,14 @@ public final class RequesterService {
     }
 
     private static void notifySuccess(RequesterBlockEntity box, ServerPlayer owner, int totalItems) {
-        if (box.showActionBarNotification()) owner.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+        if (box.showActionBarNotification()) owner.displayClientMessage(Component.translatable(
                 "qshop_requester.message.trade_success", totalItems), true);
-        if (box.showChatNotification()) owner.sendSystemMessage(net.minecraft.network.chat.Component.translatable(
+        if (box.showChatNotification()) owner.sendSystemMessage(Component.translatable(
                 "qshop_requester.message.trade_success", totalItems));
     }
 
     private static void notifyFailure(RequesterBlockEntity box, ServerPlayer owner, String reason) {
-        net.minecraft.network.chat.Component message = net.minecraft.network.chat.Component.translatable(
-                "qshop_requester.message.trade_failed", reason);
+        Component message = Component.translatable("qshop_requester.message.trade_failed", reason);
         if (box.showActionBarNotification()) owner.displayClientMessage(message, true);
         if (box.showChatNotification()) owner.sendSystemMessage(message);
     }

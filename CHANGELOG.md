@@ -2,6 +2,18 @@
 
 Release notes are grouped by Minecraft loader when a release supports both Forge and NeoForge.
 
+## [1.2.1] - 2026-08-31
+
+### NeoForge 1.21.1
+
+### Added
+
+- Added a shaped recipe using two iron ingots and one barrel to craft a requester.
+
+### Fixed
+
+- Matched requester block hardness, explosion resistance, sound, and tool requirements to the vanilla barrel.
+
 ## [1.2.0] - 2026-08-28
 
 ### NeoForge 1.21.1

@@ -34,7 +34,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly files('../Q-shop/build/libs/qshop-1.2.3.jar')
+    compileOnly files('../Q-shop/build/libs/qshop-neoforge-1.21.1-1.2.3.jar')
 }
 
 tasks.withType(JavaCompile).configureEach {

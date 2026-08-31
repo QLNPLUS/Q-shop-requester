@@ -2,6 +2,18 @@
 
 Release notes are grouped by Minecraft loader when a release supports both Forge and NeoForge.
 
+## [1.3.0] - 2026-08-31
+
+### NeoForge 1.21.1
+
+### Changed
+
+- Aligned the NeoForge artifact version with the Forge 1.3.0 release.
+
+### Forge 1.20.1
+
+- Restored requester ownership synchronization, owner display, and Claim button behavior in the Forge project.
+
 ## [1.2.1] - 2026-08-31
 
 ### NeoForge 1.21.1

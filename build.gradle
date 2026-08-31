@@ -34,7 +34,7 @@ repositories {
 
 dependencies {
     minecraft 'net.minecraftforge:forge:1.20.1-47.4.20'
-    compileOnly fg.deobf(files('../Q-shop/build/libs/qshop-1.2.2.jar'))
+    compileOnly fg.deobf(files('../Q-shop/build/libs/qshop-forge-1.20.1-1.2.4.jar'))
 }
 
 tasks.withType(JavaCompile).configureEach { it.options.encoding = 'UTF-8' }

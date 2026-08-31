@@ -39,8 +39,7 @@ public final class RequesterMod {
             () -> new RequesterBlock(Block.Properties.of()
                     .mapColor(MapColor.WOOD)
                     .strength(2.5F, 2.5F)
-                    .sound(SoundType.WOOD)
-                    .requiresCorrectToolForDrops()));
+                    .sound(SoundType.WOOD)));
     public static final RegistryObject<Item> REQUESTER_ITEM = ITEMS.register("requester",
             () -> new BlockItem(REQUESTER.get(), new Item.Properties()));
     public static final RegistryObject<BlockEntityType<RequesterBlockEntity>> REQUESTER_ENTITY =

@@ -10,13 +10,13 @@ import com.qshop.shop.Shop;
 import com.qshop.shop.ShopCommand;
 import com.qshop.shop.ShopEntry;
 import com.qshop.shop.ShopEntryType;
-import com.qshop.shop.ShopManager;
 import com.qshop.trade.RequirementCheck;
 import com.qshop.wallet.IWallet;
 import com.qshop.wallet.WalletCapability;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -24,8 +24,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.storage.LevelResource;
-import net.minecraftforge.items.IItemHandler;
-import net.minecraftforge.items.ItemStackHandler;
+import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.items.ItemStackHandler;
 
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -41,12 +41,14 @@ public final class RequesterService {
             RequesterMod.MODID, "auto_request");
     private static final int UNITS_PER_CYCLE = 1;
     private static final String FORGE_CAPS_KEY = "ForgeCaps";
+    private static final String NEOFORGE_ATTACHMENTS_KEY = "neoforge:attachments";
     private static final String WALLET_CAPABILITY_KEY = "qshop:wallet";
     private static final Object OFFLINE_LIMIT_LOCK = new Object();
 
     private RequesterService() {}
 
     public static void request(RequesterBlockEntity box) {
+        box.migrateLegacyTarget();
         if (box.owner() == null || box.getLevel() == null || box.getLevel().getServer() == null) return;
         MinecraftServer server = box.getLevel().getServer();
         ServerPlayer owner = server.getPlayerList().getPlayer(box.owner());
@@ -58,14 +60,15 @@ public final class RequesterService {
     }
 
     private static void requestOnline(RequesterBlockEntity box, ServerPlayer owner) {
-        if (box.shopId().isBlank()) {
+        RequesterTarget target = box.resolveTarget();
+        if (target == null) {
             notifyFailure(box, owner, "qshop_requester.message.no_target");
             return;
         }
         MinecraftServer server = owner.getServer();
-        Shop shop = ShopManager.get(box.shopId());
-        ShopEntry entry = findEntry(shop, box.tabIndex(), box.entryIndex());
-        if (entry == null || !validEntry(entry) || !RequirementCheck.satisfied(owner, entry)) {
+        Shop shop = target.shop();
+        ShopEntry entry = target.entry();
+        if (!validEntry(entry) || !RequirementCheck.satisfied(owner, entry)) {
             notifyFailure(box, owner, TradeResult.Status.UNSUPPORTED_ENTRY.name());
             return;
         }
@@ -73,42 +76,31 @@ public final class RequesterService {
         TradeResult result;
         if (entry.commands.isEmpty() && entry.type != ShopEntryType.COMMAND) {
             result = switch (entry.type) {
-                case BUY -> QShopAddonApi.buy(owner, box.purchased(), box.shopId(), box.tabIndex(),
-                        box.entryIndex(), UNITS_PER_CYCLE, SOURCE, box.getBlockPos());
-                case SELL -> QShopAddonApi.sell(owner, box.supplied(), box.shopId(), box.tabIndex(),
-                        box.entryIndex(), UNITS_PER_CYCLE, SOURCE, box.getBlockPos());
-                case BARTER -> QShopAddonApi.barter(owner, box.supplied(), box.purchased(), box.shopId(),
-                        box.tabIndex(), box.entryIndex(), UNITS_PER_CYCLE, SOURCE, box.getBlockPos());
+                case BUY -> QShopAddonApi.buy(owner, box.purchased(), shop.id, target.tabIndex(),
+                        target.entryIndex(), UNITS_PER_CYCLE, SOURCE, box.getBlockPos());
+                case SELL -> QShopAddonApi.sell(owner, box.supplied(), shop.id, target.tabIndex(),
+                        target.entryIndex(), UNITS_PER_CYCLE, SOURCE, box.getBlockPos());
+                case BARTER -> QShopAddonApi.barter(owner, box.supplied(), box.purchased(), shop.id,
+                        target.tabIndex(), target.entryIndex(), UNITS_PER_CYCLE, SOURCE, box.getBlockPos());
                 case COMMAND -> failure(TradeResult.Status.UNSUPPORTED_ENTRY);
             };
         } else {
             result = tradeWithHandlers(box, server, owner, owner.getUUID(), shop, entry,
-                    box.tabIndex(), box.entryIndex());
+                    target.tabIndex(), target.entryIndex());
         }
         if (result.isSuccess()) notifySuccess(box, owner, result.getTotalItems());
         else notifyFailure(box, owner, result.getStatus().name());
     }
 
     private static TradeResult tradeOffline(RequesterBlockEntity box, MinecraftServer server, UUID owner) {
-        if (box.shopId().isBlank()) return failure(TradeResult.Status.INVALID_ARGUMENT);
-        Shop shop = ShopManager.get(box.shopId());
-        ShopEntry entry = findEntry(shop, box.tabIndex(), box.entryIndex());
-        if (entry == null) {
-            return shop == null ? failure(TradeResult.Status.SHOP_NOT_FOUND)
-                    : failure(box.tabIndex() < 0 || box.tabIndex() >= shop.tabs.size()
-                    ? TradeResult.Status.TAB_NOT_FOUND : TradeResult.Status.ENTRY_NOT_FOUND);
-        }
+        box.migrateLegacyTarget();
+        RequesterTarget target = box.resolveTarget();
+        if (target == null) return failure(TradeResult.Status.ENTRY_NOT_FOUND);
+        Shop shop = target.shop();
+        ShopEntry entry = target.entry();
         if (!validEntry(entry)) return failure(TradeResult.Status.UNSUPPORTED_ENTRY);
         return tradeWithHandlers(box, server, null, owner, shop, entry,
-                box.tabIndex(), box.entryIndex());
-    }
-
-    private static ShopEntry findEntry(Shop shop, int tabIndex, int entryIndex) {
-        if (shop == null) return null;
-        shop.ensureTabs();
-        if (tabIndex < 0 || tabIndex >= shop.tabs.size()) return null;
-        List<ShopEntry> entries = shop.tabs.get(tabIndex).entries;
-        return entryIndex >= 0 && entryIndex < entries.size() ? entries.get(entryIndex) : null;
+                target.tabIndex(), target.entryIndex());
     }
 
     private static TradeResult tradeWithHandlers(RequesterBlockEntity box, MinecraftServer server,
@@ -423,7 +415,7 @@ public final class RequesterService {
         int count = 0;
         for (int slot = 0; slot < handler.getSlots(); slot++) {
             ItemStack stack = handler.getStackInSlot(slot);
-            if (ItemStack.isSameItemSameTags(stack, target)) {
+            if (ItemStack.isSameItemSameComponents(stack, target)) {
                 count = Math.min(Integer.MAX_VALUE, count + stack.getCount());
             }
         }
@@ -461,7 +453,7 @@ public final class RequesterService {
         int remaining = amount;
         for (int slot = 0; slot < handler.getSlots() && remaining > 0; slot++) {
             ItemStack stack = handler.getStackInSlot(slot);
-            if (!ItemStack.isSameItemSameTags(stack, target)) continue;
+            if (!ItemStack.isSameItemSameComponents(stack, target)) continue;
             ItemStack extracted = handler.extractItem(slot, Math.min(remaining, stack.getCount()), false);
             remaining -= extracted.getCount();
         }
@@ -475,9 +467,12 @@ public final class RequesterService {
             Path target = server.getWorldPath(LevelResource.PLAYER_DATA_DIR).resolve(owner + ".dat");
             Path temp = target.resolveSibling(target.getFileName() + ".qshop-requester.tmp");
             try {
-                CompoundTag playerData = NbtIo.readCompressed(target.toFile());
+                CompoundTag playerData = NbtIo.readCompressed(target, NbtAccounter.unlimitedHeap());
+                CompoundTag attachments = playerData.getCompound(NEOFORGE_ATTACHMENTS_KEY);
                 CompoundTag forgeCaps = playerData.getCompound(FORGE_CAPS_KEY);
-                CompoundTag wallet = forgeCaps.getCompound(WALLET_CAPABILITY_KEY);
+                CompoundTag wallet = attachments.contains(WALLET_CAPABILITY_KEY)
+                        ? attachments.getCompound(WALLET_CAPABILITY_KEY)
+                        : forgeCaps.getCompound(WALLET_CAPABILITY_KEY);
                 CompoundTag limits = wallet.getCompound("limits");
                 CompoundTag value = limits.getCompound(key);
                 int count = period.equals(value.getString("period")) ? value.getInt("count") : 0;
@@ -485,9 +480,9 @@ public final class RequesterService {
                 value.putInt("count", count + amount);
                 limits.put(key, value);
                 wallet.put("limits", limits);
-                forgeCaps.put(WALLET_CAPABILITY_KEY, wallet);
-                playerData.put(FORGE_CAPS_KEY, forgeCaps);
-                NbtIo.writeCompressed(playerData, temp.toFile());
+                attachments.put(WALLET_CAPABILITY_KEY, wallet);
+                playerData.put(NEOFORGE_ATTACHMENTS_KEY, attachments);
+                NbtIo.writeCompressed(playerData, temp);
                 try {
                     Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING,
                             StandardCopyOption.ATOMIC_MOVE);

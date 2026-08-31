@@ -1,5 +1,6 @@
 package com.qshop.requester;
 
+import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -19,12 +20,15 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.BlockHitResult;
-import net.minecraftforge.network.NetworkHooks;
 
 import javax.annotation.Nullable;
 
 public final class RequesterBlock extends BaseEntityBlock {
     public RequesterBlock(BlockBehaviour.Properties properties) { super(properties); }
+
+    @Override protected MapCodec<? extends BaseEntityBlock> codec() {
+        return simpleCodec(RequesterBlock::new);
+    }
 
     @Override public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new RequesterBlockEntity(pos, state);
@@ -41,11 +45,11 @@ public final class RequesterBlock extends BaseEntityBlock {
         }
     }
 
-    @Override public InteractionResult use(BlockState state, Level level, BlockPos pos,
-                                           Player player, InteractionHand hand, BlockHitResult hit) {
+    @Override protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
+                                                         Player player, BlockHitResult hit) {
         if (!(player instanceof ServerPlayer serverPlayer)) return InteractionResult.SUCCESS;
         if (level.getBlockEntity(pos) instanceof RequesterBlockEntity box) {
-            NetworkHooks.openScreen(serverPlayer, new net.minecraft.world.MenuProvider() {
+            serverPlayer.openMenu(new net.minecraft.world.MenuProvider() {
                 @Override public Component getDisplayName() {
                     return Component.translatable("container.qshop_requester.requester");
                 }
@@ -60,6 +64,13 @@ public final class RequesterBlock extends BaseEntityBlock {
             RequesterNetwork.sendShops(serverPlayer);
         }
         return InteractionResult.CONSUME;
+    }
+
+    @Override protected net.minecraft.world.ItemInteractionResult useItemOn(
+            ItemStack stack, BlockState state, Level level, BlockPos pos, Player player,
+            InteractionHand hand, BlockHitResult hit) {
+        useWithoutItem(state, level, pos, player, hit);
+        return net.minecraft.world.ItemInteractionResult.sidedSuccess(level.isClientSide);
     }
 
     @Override public <T extends BlockEntity> BlockEntityTicker<T> getTicker(

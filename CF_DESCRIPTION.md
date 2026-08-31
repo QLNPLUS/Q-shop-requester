@@ -2,11 +2,11 @@
 
 ## Short Description
 
-Automatically purchase configured QShop trades with currency or barter, even while the owner is offline.
+Automatically purchase configured QShop trades with currency or barter on Forge 1.20.1 and NeoForge 1.21.1, even while the owner is offline.
 
 ## Full Description
 
-QShop Requester is a QShop addon that reads shop entries and automatically completes selected purchases at a configured interval.
+QShop Requester is a QShop addon available for Forge 1.20.1 and NeoForge 1.21.1. It reads shop entries and automatically completes selected purchases at a configured interval.
 
 ### Features
 
@@ -24,12 +24,12 @@ QShop Requester is a QShop addon that reads shop entries and automatically compl
 
 ### Dependencies
 
-- Minecraft Forge 1.20.1
+- Minecraft Forge 1.20.1 with Forge 47.x, or Minecraft NeoForge 1.21.1 with NeoForge 21.1.x
 - [QShop](https://www.curseforge.com/minecraft/mc-mods/q-shop) 1.1.0 or newer, below 2.0
 
 ### Installation
 
-1. Install Minecraft Forge 1.20.1.
+1. Install Minecraft Forge 1.20.1 or Minecraft NeoForge 1.21.1.
 2. Install [QShop](https://www.curseforge.com/minecraft/mc-mods/q-shop).
 3. Place the `qshop-requester` jar file in the `mods` folder.
 

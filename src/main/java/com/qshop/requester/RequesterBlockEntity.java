@@ -1,18 +1,15 @@
 package com.qshop.requester;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.common.capabilities.Capability;
-import net.minecraftforge.common.capabilities.ForgeCapabilities;
-import net.minecraftforge.common.util.LazyOptional;
-import net.minecraftforge.items.IItemHandler;
-import net.minecraftforge.items.ItemStackHandler;
+import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.items.ItemStackHandler;
 import com.qshop.shop.Shop;
 import com.qshop.shop.ShopEntryType;
 import com.qshop.shop.ShopManager;
@@ -30,10 +27,6 @@ public final class RequesterBlockEntity extends BlockEntity {
     private final ItemStackHandler supplied = new ItemStackHandler(12) {
         @Override protected void onContentsChanged(int slot) { setChanged(); }
     };
-    private final LazyOptional<IItemHandler> inputCapability = LazyOptional.of(
-            () -> new RequesterItemHandler(supplied, true, false));
-    private final LazyOptional<IItemHandler> outputCapability = LazyOptional.of(
-            () -> new RequesterItemHandler(purchased, false, true));
 
     @Nullable private UUID owner;
     private String ownerName = "";
@@ -41,9 +34,13 @@ public final class RequesterBlockEntity extends BlockEntity {
     private boolean actionBarNotifications = true;
     private boolean chatNotifications = true;
     private boolean enabled = true;
-    private String shopId = "";
-    private int tabIndex = 0;
-    private int entryIndex = 0;
+    private String shopUuid = "";
+    private String tabUuid = "";
+    private String entryUuid = "";
+    // Legacy fields are read only to migrate requester blocks created before 1.1.1.
+    private String legacyShopId = "";
+    private int legacyTabIndex = 0;
+    private int legacyEntryIndex = 0;
     private long nextTradeTick = -1L;
 
     public RequesterBlockEntity(BlockPos pos, BlockState state) {
@@ -71,16 +68,40 @@ public final class RequesterBlockEntity extends BlockEntity {
     public boolean showActionBarNotification() { return actionBarNotifications; }
     public boolean showChatNotification() { return chatNotifications; }
     public boolean enabled() { return enabled; }
-    public String shopId() { return shopId; }
-    public int tabIndex() { return tabIndex; }
-    public int entryIndex() { return entryIndex; }
+    public String shopUuid() { return shopUuid; }
+    public String tabUuid() { return tabUuid; }
+    public String entryUuid() { return entryUuid; }
+
+    /** Convert the old index-based target once Q-shop has loaded its live data. */
+    public boolean migrateLegacyTarget() {
+        if (!shopUuid.isBlank() || !tabUuid.isBlank() || !entryUuid.isBlank()
+                || legacyShopId.isBlank()) return false;
+        Shop shop = ShopManager.get(legacyShopId);
+        if (shop == null) return false;
+        shop.ensureTabs();
+        if (legacyTabIndex < 0 || legacyTabIndex >= shop.tabs.size()) return false;
+        var tab = shop.tabs.get(legacyTabIndex);
+        if (legacyEntryIndex < 0 || legacyEntryIndex >= tab.entries.size()) return false;
+        var entry = tab.entries.get(legacyEntryIndex);
+        tab.ensureUuid();
+        entry.ensureUuid();
+        shopUuid = shop.uuid == null ? "" : shop.uuid.toString();
+        tabUuid = tab.uuid;
+        entryUuid = entry.uuid;
+        legacyShopId = "";
+        legacyTabIndex = 0;
+        legacyEntryIndex = 0;
+        setChanged();
+        return true;
+    }
+
+    public RequesterTarget resolveTarget() {
+        return RequesterTarget.resolve(shopUuid, tabUuid, entryUuid);
+    }
 
     public ShopEntryType selectedType() {
-        Shop shop = ShopManager.get(shopId);
-        if (shop == null || tabIndex >= shop.tabs.size()) return ShopEntryType.BUY;
-        var entries = shop.tabs.get(tabIndex).entries;
-        return entryIndex >= 0 && entryIndex < entries.size()
-                ? entries.get(entryIndex).type : ShopEntryType.BUY;
+        RequesterTarget target = resolveTarget();
+        return target == null ? ShopEntryType.BUY : target.entry().type;
     }
 
     public void setOwner(UUID uuid, String name) {
@@ -100,39 +121,47 @@ public final class RequesterBlockEntity extends BlockEntity {
     }
 
     public void setSettings(int intervalTicks, boolean actionBar, boolean chat,
-                            boolean enabled, String shopId, int tabIndex, int entryIndex) {
+                            boolean enabled, String shopUuid, String tabUuid, String entryUuid) {
         this.intervalTicks = Math.max(20, Math.min(intervalTicks, MAX_INTERVAL_TICKS));
         this.actionBarNotifications = actionBar;
         this.chatNotifications = chat;
         this.enabled = enabled;
-        this.shopId = shopId == null ? "" : shopId.substring(0, Math.min(128, shopId.length()));
-        this.tabIndex = Math.max(0, tabIndex);
-        this.entryIndex = Math.max(0, entryIndex);
+        this.shopUuid = bounded(shopUuid);
+        this.tabUuid = bounded(tabUuid);
+        this.entryUuid = bounded(entryUuid);
+        this.legacyShopId = "";
+        this.legacyTabIndex = 0;
+        this.legacyEntryIndex = 0;
         this.nextTradeTick = level == null ? -1L : level.getGameTime() + this.intervalTicks;
         setChanged();
         if (level != null) level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
     }
 
-    @Override protected void saveAdditional(CompoundTag tag) {
-        super.saveAdditional(tag);
-        tag.put("purchased", purchased.serializeNBT());
-        tag.put("supplied", supplied.serializeNBT());
+    @Override protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
+        tag.put("purchased", purchased.serializeNBT(registries));
+        tag.put("supplied", supplied.serializeNBT(registries));
         if (owner != null) tag.putUUID("owner", owner);
         tag.putString("ownerName", ownerName);
         tag.putInt("intervalTicks", intervalTicks);
         tag.putBoolean("actionBar", actionBarNotifications);
         tag.putBoolean("chat", chatNotifications);
         tag.putBoolean("enabled", enabled);
-        tag.putString("shopId", shopId);
-        tag.putInt("tabIndex", tabIndex);
-        tag.putInt("entryIndex", entryIndex);
+        tag.putString("shopUuid", shopUuid);
+        tag.putString("tabUuid", tabUuid);
+        tag.putString("entryUuid", entryUuid);
+        if (shopUuid.isBlank() && !legacyShopId.isBlank()) {
+            tag.putString("shopId", legacyShopId);
+            tag.putInt("tabIndex", legacyTabIndex);
+            tag.putInt("entryIndex", legacyEntryIndex);
+        }
         if (nextTradeTick >= 0L) tag.putLong("nextTradeTick", nextTradeTick);
     }
 
-    @Override public void load(CompoundTag tag) {
-        super.load(tag);
-        if (tag.contains("purchased")) purchased.deserializeNBT(tag.getCompound("purchased"));
-        if (tag.contains("supplied")) supplied.deserializeNBT(tag.getCompound("supplied"));
+    @Override public void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
+        if (tag.contains("purchased")) purchased.deserializeNBT(registries, tag.getCompound("purchased"));
+        if (tag.contains("supplied")) supplied.deserializeNBT(registries, tag.getCompound("supplied"));
         owner = tag.hasUUID("owner") ? tag.getUUID("owner") : null;
         ownerName = tag.getString("ownerName");
         intervalTicks = Math.max(20, Math.min(tag.getInt("intervalTicks"), MAX_INTERVAL_TICKS));
@@ -140,20 +169,17 @@ public final class RequesterBlockEntity extends BlockEntity {
         actionBarNotifications = !tag.contains("actionBar") || tag.getBoolean("actionBar");
         chatNotifications = !tag.contains("chat") || tag.getBoolean("chat");
         enabled = !tag.contains("enabled") || tag.getBoolean("enabled");
-        shopId = tag.getString("shopId");
-        tabIndex = Math.max(0, tag.getInt("tabIndex"));
-        entryIndex = Math.max(0, tag.getInt("entryIndex"));
+        shopUuid = tag.getString("shopUuid");
+        tabUuid = tag.getString("tabUuid");
+        entryUuid = tag.getString("entryUuid");
+        legacyShopId = tag.getString("shopId");
+        legacyTabIndex = Math.max(0, tag.getInt("tabIndex"));
+        legacyEntryIndex = Math.max(0, tag.getInt("entryIndex"));
         nextTradeTick = tag.contains("nextTradeTick") ? tag.getLong("nextTradeTick") : -1L;
     }
 
-    @Override public <T> LazyOptional<T> getCapability(Capability<T> capability, @Nullable Direction side) {
-        if (capability != ForgeCapabilities.ITEM_HANDLER) return super.getCapability(capability, side);
-        return (side == Direction.DOWN ? outputCapability : inputCapability).cast();
+    private static String bounded(String value) {
+        return value == null ? "" : value.substring(0, Math.min(128, value.length()));
     }
 
-    @Override public void invalidateCaps() {
-        super.invalidateCaps();
-        inputCapability.invalidate();
-        outputCapability.invalidate();
-    }
 }

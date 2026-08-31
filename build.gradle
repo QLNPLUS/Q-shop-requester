@@ -1,58 +1,62 @@
 plugins {
-    id 'eclipse'
+    id 'java-library'
     id 'idea'
     id 'maven-publish'
-    id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
+    id 'net.neoforged.moddev' version '2.0.141'
 }
 
+version = mod_version
+group = mod_group_id
+base { archivesName = "${mod_id}-neoforge-1.21.1" }
 
-group = 'com.qshop'
-version = '1.1.0'
-base { archivesName = 'qshop-requester' }
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(17)
-
-minecraft {
-    mappings channel: 'official', version: '1.20.1'
+neoForge {
+    version = '21.1.248'
     runs {
+        client { client() }
+        server { server() }
         configureEach {
-            workingDirectory project.file('run')
-            property 'forge.logging.console.level', 'debug'
-            mods {
-                qshop_requester { source sourceSets.main }
-            }
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
         }
-        client {}
-        server {}
+    }
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
     }
 }
 
 repositories {
-    maven { url = 'https://maven.minecraftforge.net' }
     mavenCentral()
+    maven { name = 'NeoForge'; url = 'https://maven.neoforged.net/releases/' }
 }
 
 dependencies {
-    minecraft 'net.minecraftforge:forge:1.20.1-47.4.20'
-    compileOnly fg.deobf(files('../Q-shop/build/libs/qshop-1.2.2.jar'))
+    compileOnly files('../Q-shop/build/libs/qshop-1.2.3.jar')
 }
 
-tasks.withType(JavaCompile).configureEach { it.options.encoding = 'UTF-8' }
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
 
 processResources {
-    inputs.property 'version', project.version
-    filesMatching(['META-INF/mods.toml']) { expand version: project.version }
+    inputs.properties([
+            mod_id: mod_id,
+            mod_name: mod_name,
+            mod_version: mod_version,
+            mod_license: mod_license,
+    ])
+    filesMatching('META-INF/neoforge.mods.toml') {
+        expand mod_id: mod_id, mod_name: mod_name, mod_version: mod_version,
+                mod_license: mod_license
+    }
 }
 
-jar {
-    manifest {
-        attributes([
-                'Specification-Title': 'qshop_requester',
-                'Specification-Vendor': 'qshop',
-                'Specification-Version': '1',
-                'Implementation-Title': project.name,
-                'Implementation-Version': project.jar.archiveVersion
-        ])
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) { from components.java }
     }
-    finalizedBy 'reobfJar'
 }

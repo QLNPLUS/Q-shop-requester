@@ -1,5 +1,37 @@
 # Changelog
 
+Release notes are grouped by Minecraft loader when a release supports both Forge and NeoForge.
+
+## [1.2.0] - 2026-08-28
+
+### NeoForge 1.21.1
+
+### Added
+
+- Added requester ownership information to the settings page with the owner avatar, name, and online status.
+- Added a Claim button that transfers requester ownership to the player using the container.
+- Added server-side ownership synchronization for all players viewing the same requester box.
+- Added owner controls to the requester layout debug editor.
+- Bumped the network protocol for the new owner synchronization payload.
+
+### Changed
+
+- Kept requester ownership changes independent from the shop entry selection list.
+- Preserved requester settings and UUID-based shop, tab, and entry targets when ownership is claimed.
+
+### Forge 1.20.1
+
+- No Forge 1.20.1-specific change was included in this NeoForge workspace entry.
+
+## [1.1.1] - 2026-08-27
+
+### Changed
+
+- Switched requester targets from numeric shop, tab, and entry indexes to stable shop, tab, and entry UUIDs.
+- Added automatic migration for requester blocks created before version 1.1.1.
+- Made shop reordering and entry reordering safe for existing requester targets.
+- Updated the shop selection and network synchronization flow to preserve UUID-based targets.
+
 ## [1.1.0] - 2026-08-26
 
 ### Added

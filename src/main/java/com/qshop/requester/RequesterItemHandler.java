@@ -1,7 +1,7 @@
 package com.qshop.requester;
 
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.items.IItemHandler;
+import net.neoforged.neoforge.items.IItemHandler;
 
 /** Directional view used by hoppers and pipes. */
 final class RequesterItemHandler implements IItemHandler {

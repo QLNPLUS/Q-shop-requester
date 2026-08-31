@@ -3,14 +3,14 @@ package com.qshop.requester;
 import com.qshop.requester.client.RequesterScreen;
 import com.qshop.client.ShopScreen;
 import com.qshop.net.ClientShopEntry;
+import com.qshop.net.ClientTab;
 import com.qshop.net.OpenShopPacket;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.MenuScreens;
-import net.minecraftforge.client.event.ScreenEvent;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.ScreenEvent;
+import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -18,11 +18,10 @@ import java.util.List;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.neoforged.api.distmarker.OnlyIn;
 
 @OnlyIn(Dist.CLIENT)
-@Mod.EventBusSubscriber(modid = RequesterMod.MODID, value = Dist.CLIENT,
-        bus = Mod.EventBusSubscriber.Bus.FORGE)
+@EventBusSubscriber(modid = RequesterMod.MODID, value = Dist.CLIENT)
 public final class RequesterClient {
     private static final Field SHOP_DATA = field(ShopScreen.class, "data");
     private static final Field SHOP_TRADE_INDEX = field(ShopScreen.class, "tradeIndex");
@@ -32,18 +31,20 @@ public final class RequesterClient {
     private static List<RequesterNetwork.ShopInfo> shops = List.of();
     private static RequesterScreen selectionOrigin;
     private static String selectionShopId = "";
+    private static String selectionShopUuid = "";
 
     private RequesterClient() {}
 
-    public static void onClientSetup(FMLClientSetupEvent event) {
-        event.enqueueWork(() -> MenuScreens.register(RequesterMod.REQUESTER_MENU.get(), RequesterScreen::new));
+    public static void registerMenuScreens(RegisterMenuScreensEvent event) {
+        event.register(RequesterMod.REQUESTER_MENU.get(), RequesterScreen::new);
     }
 
     public static void applyState(RequesterNetwork.SyncStatePacket packet) {
         if (Minecraft.getInstance().screen instanceof RequesterScreen screen
                 && screen.getMenu().pos().equals(packet.pos())) {
             screen.getMenu().setSettings(packet.intervalTicks(), packet.actionBar(), packet.chat(),
-                    packet.enabled(), packet.shopId(), packet.tabIndex(), packet.entryIndex());
+                    packet.enabled(), packet.shopUuid(), packet.tabUuid(), packet.entryUuid());
+            screen.getMenu().setOwnerData(packet.owner(), packet.ownerName());
             screen.refreshIntervalInput();
         }
     }
@@ -60,10 +61,11 @@ public final class RequesterClient {
     public static List<RequesterNetwork.TargetInfo> targets() { return targets; }
     public static List<RequesterNetwork.ShopInfo> shops() { return shops; }
 
-    public static void beginShopSelection(RequesterScreen origin, String shopId) {
+    public static void beginShopSelection(RequesterScreen origin, String shopId, String shopUuid) {
         selectionOrigin = origin;
         selectionShopId = shopId == null ? "" : shopId;
-        RequesterNetwork.openShopForSelection(origin.getMenu().pos(), selectionShopId);
+        selectionShopUuid = shopUuid == null ? "" : shopUuid;
+        RequesterNetwork.openShopForSelection(origin.getMenu().pos(), selectionShopUuid);
     }
 
     @SubscribeEvent
@@ -96,12 +98,20 @@ public final class RequesterClient {
             int serverTabIndex = rawTab instanceof Number number ? number.intValue() : -1;
             ClientShopEntry entry = data.entries.get(visibleEntryIndex);
             int serverEntryIndex = entry.serverIndex;
-            if (serverTabIndex < 0 || serverEntryIndex < 0) return;
+            ClientTab tab = data.tabs.stream()
+                    .filter(value -> value.serverIndex == serverTabIndex)
+                    .findFirst().orElse(null);
+            if (serverTabIndex < 0 || serverEntryIndex < 0 || tab == null
+                    || tab.uuid == null || tab.uuid.isBlank()
+                    || entry.uuid == null || entry.uuid.isBlank()
+                    || selectionShopUuid.isBlank()) return;
 
             RequesterScreen origin = selectionOrigin;
+            String shopUuid = selectionShopUuid;
             selectionOrigin = null;
             selectionShopId = "";
-            origin.selectTargetFromShop(data.shopId, serverTabIndex, serverEntryIndex);
+            selectionShopUuid = "";
+            origin.selectTargetFromShop(shopUuid, tab.uuid, entry.uuid);
             Minecraft.getInstance().setScreen(origin);
         } catch (ReflectiveOperationException | ClassCastException ignored) {
             // Q-shop is an optional compile-time integration; a changed screen

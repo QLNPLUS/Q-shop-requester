@@ -1,0 +1,120 @@
+name: Publish QShop Requester NeoForge
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Git tag to build and publish
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: curseforge-requester-neoforge-${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_VERSION: ${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out Requester NeoForge source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}
+          path: Q-shop-requester-neoforge-1.21.1
+
+      - name: Check out QShop NeoForge dependency
+        uses: actions/checkout@v4
+        with:
+          repository: QLNPLUS/Q-shop
+          ref: neoforge-1.21.1
+          path: Q-shop-neoforge-1.21.1
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Remove local build settings
+        run: |
+          sed -i -E '/^systemProp\.(http|https)\.proxy(Host|Port)=|^org\.gradle\.java\.home=/d' \
+            Q-shop-neoforge-1.21.1/gradle.properties \
+            Q-shop-requester-neoforge-1.21.1/gradle.properties
+
+      - name: Prepare CurseForge version
+        env:
+          RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+        run: echo "CURSEFORGE_VERSION=${RELEASE_VERSION#v}" >> "$GITHUB_ENV"
+
+      - name: Validate CurseForge configuration
+        env:
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        run: |
+          test -n "$CURSEFORGE_PROJECT_ID" || {
+            echo "Missing repository variable CURSEFORGE_PROJECT_ID"
+            exit 1
+          }
+          test -n "$CURSEFORGE_TOKEN" || {
+            echo "Missing repository secret CURSEFORGE_TOKEN"
+            exit 1
+          }
+
+      - name: Build QShop NeoForge dependency
+        run: |
+          chmod +x Q-shop-neoforge-1.21.1/gradlew
+          (cd Q-shop-neoforge-1.21.1 && ./gradlew build --no-daemon)
+
+      - name: Build Requester NeoForge mod
+        run: |
+          chmod +x Q-shop-requester-neoforge-1.21.1/gradlew
+          (cd Q-shop-requester-neoforge-1.21.1 && ./gradlew build --no-daemon)
+
+      - name: Prepare current NeoForge changelog
+        working-directory: Q-shop-requester-neoforge-1.21.1
+        env:
+          RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+        run: |
+          version="${RELEASE_VERSION#v}"
+          awk -v version="$version" '
+            /^##[[:space:]]+/ {
+              heading = $2
+              gsub(/^\[/, "", heading)
+              gsub(/\]$/, "", heading)
+              if (found && heading != version) exit
+              if (heading == version) found = 1
+            }
+            found { print }
+          ' CHANGELOG.md > build/curseforge-changelog.md
+          test -s build/curseforge-changelog.md || {
+            echo "Missing CHANGELOG.md section for version $version"
+            exit 1
+          }
+
+      - name: Publish Requester NeoForge mod file
+        uses: Kira-NT/mc-publish@v3
+        with:
+          curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID }}
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-tag: ${{ env.RELEASE_VERSION }}
+          files: Q-shop-requester-neoforge-1.21.1/build/libs/qshop-requester-neoforge-1.21.1-*.jar
+          version: ${{ env.CURSEFORGE_VERSION }}
+          name: QShop Requester ${{ env.CURSEFORGE_VERSION }} NeoForge 1.21.1
+          version-type: release
+          changelog-file: Q-shop-requester-neoforge-1.21.1/build/curseforge-changelog.md
+          loaders: neoforge
+          game-versions: 1.21.1
+          java: 21

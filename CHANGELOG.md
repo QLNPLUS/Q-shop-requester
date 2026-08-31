@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.1] - 2026-08-31
+
+### Added
+
+- Added a shaped recipe using two iron ingots and one barrel to craft a requester.
+
+### Fixed
+
+- Matched requester block hardness, explosion resistance, sound, and tool requirements to the vanilla barrel.
+
 ## [1.1.0] - 2026-08-26
 
 ### Added

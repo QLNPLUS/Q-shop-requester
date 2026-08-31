@@ -9,6 +9,8 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.items.SlotItemHandler;
 
+import java.util.UUID;
+
 public final class RequesterMenu extends AbstractContainerMenu {
     private final BlockPos pos;
     private final RequesterBlockEntity box;
@@ -16,6 +18,8 @@ public final class RequesterMenu extends AbstractContainerMenu {
     private boolean actionBar = true;
     private boolean chat = true;
     private boolean enabled = true;
+    private UUID owner;
+    private String ownerName = "";
     private String shopId = "";
     private int tabIndex;
     private int entryIndex;
@@ -61,6 +65,8 @@ public final class RequesterMenu extends AbstractContainerMenu {
         actionBar = box.showActionBarNotification();
         chat = box.showChatNotification();
         enabled = box.enabled();
+        owner = box.owner();
+        ownerName = box.ownerName();
         shopId = box.shopId();
         tabIndex = box.tabIndex();
         entryIndex = box.entryIndex();
@@ -72,6 +78,8 @@ public final class RequesterMenu extends AbstractContainerMenu {
     public boolean actionBar() { return actionBar; }
     public boolean chat() { return chat; }
     public boolean enabled() { return enabled; }
+    public UUID owner() { return owner; }
+    public String ownerName() { return ownerName; }
     public String shopId() { return shopId; }
     public int tabIndex() { return tabIndex; }
     public int entryIndex() { return entryIndex; }
@@ -85,6 +93,11 @@ public final class RequesterMenu extends AbstractContainerMenu {
         this.shopId = shopId == null ? "" : shopId;
         this.tabIndex = Math.max(0, tabIndex);
         this.entryIndex = Math.max(0, entryIndex);
+    }
+
+    public void setOwnerData(UUID owner, String ownerName) {
+        this.owner = owner;
+        this.ownerName = ownerName == null ? "" : ownerName;
     }
 
     @Override public boolean stillValid(Player player) { return box.stillValid(player); }

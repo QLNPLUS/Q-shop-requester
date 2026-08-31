@@ -1,5 +1,6 @@
 package com.qshop.requester.client;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.qshop.requester.RequesterMenu;
 import com.qshop.requester.RequesterMod;
 import com.qshop.requester.RequesterNetwork;
@@ -9,7 +10,10 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.Util;
 import net.minecraft.world.entity.player.Inventory;
@@ -19,6 +23,7 @@ import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu> {
     private static final int WHITE = 0xFFFFFFFF;
@@ -83,7 +88,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         searchInput.setTextColorUneditable(WHITE);
         searchInput.setVisible(false);
         addRenderableWidget(searchInput);
-        intervalInput = new LayeredEditBox(font, leftPos + 10, topPos + 112, 92, 12,
+        intervalInput = new LayeredEditBox(font, leftPos + 10, topPos + 124, 92, 12,
                 Component.translatable("qshop_requester.setting.interval_input"));
         intervalInput.setMaxLength(9);
         intervalInput.setFilter(value -> value.matches("\\d*"));
@@ -225,26 +230,53 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         drawText(g, Component.translatable("qshop_requester.tab.settings"),
                 layoutX(RequesterLayoutDebug.Widget.SETTINGS_TITLE, 8),
                 layoutY(RequesterLayoutDebug.Widget.SETTINGS_TITLE, 6), WHITE);
+        drawAvatar(g,
+                screenX(RequesterLayoutDebug.Widget.OWNER_AVATAR, 32),
+                screenY(RequesterLayoutDebug.Widget.OWNER_AVATAR, 4), menu.owner());
+        String ownerName = menu.owner() == null || menu.ownerName().isBlank()
+                ? Component.translatable("qshop_requester.owner.none").getString() : menu.ownerName();
+        int ownerInfoX = layoutX(RequesterLayoutDebug.Widget.OWNER_INFO, 56);
+        int ownerInfoY = layoutY(RequesterLayoutDebug.Widget.OWNER_INFO, 7);
+        drawText(g, trim(ownerName, 8), ownerInfoX, ownerInfoY, WHITE);
+        if (menu.owner() != null) {
+            boolean online = Minecraft.getInstance().getConnection() != null
+                    && Minecraft.getInstance().getConnection().getPlayerInfo(menu.owner()) != null;
+            drawText(g, Component.translatable(online
+                            ? "qshop_requester.owner.online" : "qshop_requester.owner.offline"),
+                    layoutX(RequesterLayoutDebug.Widget.OWNER_INFO, 56),
+                    layoutY(RequesterLayoutDebug.Widget.OWNER_INFO, 18),
+                    online ? 0xFF2E8B57 : 0xFFC0392B);
+        }
+        Component claimLabel = Component.translatable("qshop_requester.owner.claim");
+        int claimWidth = buttonWidth(claimLabel, 20, 60);
+        int claimX = screenX(RequesterLayoutDebug.Widget.OWNER_BUTTON, 108);
+        int claimY = screenY(RequesterLayoutDebug.Widget.OWNER_BUTTON, 4);
+        RequesterTextures.button(g, claimX, claimY, claimWidth, BUTTON_H,
+                inside(mx, my, claimX, claimY, claimWidth, BUTTON_H), true);
+        drawCentered(g, claimLabel.getString(),
+                layoutX(RequesterLayoutDebug.Widget.OWNER_BUTTON, 108 + claimWidth / 2),
+                layoutY(RequesterLayoutDebug.Widget.OWNER_BUTTON, 8), WHITE, claimWidth - 8);
+
         int searchX = layoutX(RequesterLayoutDebug.Widget.SEARCH_INPUT, 8);
-        int searchY = layoutY(RequesterLayoutDebug.Widget.SEARCH_INPUT, 19);
+        int searchY = layoutY(RequesterLayoutDebug.Widget.SEARCH_INPUT, 30);
         RequesterTextures.input(g, leftPos + searchX, topPos + searchY, 160, 14,
                 searchInput != null && searchInput.isFocused());
         int bx = screenX(RequesterLayoutDebug.Widget.TARGET_BUTTON, 8);
-        int by = screenY(RequesterLayoutDebug.Widget.TARGET_BUTTON, 34);
+        int by = screenY(RequesterLayoutDebug.Widget.TARGET_BUTTON, 45);
         RequesterTextures.button(g, bx, by, MAX_BUTTON_W, BUTTON_H,
                 inside(mx, my, bx, by, MAX_BUTTON_W, BUTTON_H), !filteredShops().isEmpty());
         drawCentered(g, selectedLabel(),
                 layoutX(RequesterLayoutDebug.Widget.TARGET_BUTTON, 8 + MAX_BUTTON_W / 2),
-                layoutY(RequesterLayoutDebug.Widget.TARGET_BUTTON, 38), WHITE, 148);
+                layoutY(RequesterLayoutDebug.Widget.TARGET_BUTTON, 49), WHITE, 148);
 
         RequesterNetwork.TargetInfo selected = selectedTarget();
         if (selected == null) {
             drawText(g, Component.translatable("qshop_requester.target.none"),
                     layoutX(RequesterLayoutDebug.Widget.SELECTED_INFO, 30),
-                    layoutY(RequesterLayoutDebug.Widget.SELECTED_INFO, 55), WHITE);
+                    layoutY(RequesterLayoutDebug.Widget.SELECTED_INFO, 67), WHITE);
         } else {
             int infoX = screenX(RequesterLayoutDebug.Widget.SELECTED_INFO, 8);
-            int infoY = screenY(RequesterLayoutDebug.Widget.SELECTED_INFO, 51);
+            int infoY = screenY(RequesterLayoutDebug.Widget.SELECTED_INFO, 63);
             g.renderItem(selected.display, infoX, infoY);
             drawScrollingText(g, selected.label, infoX + 22, infoY + 3, 138);
             List<String> details = targetDetails(selected);
@@ -255,30 +287,43 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
         drawText(g, Component.translatable("qshop_requester.setting.interval"),
                 layoutX(RequesterLayoutDebug.Widget.INTERVAL_LABEL, 8),
-                layoutY(RequesterLayoutDebug.Widget.INTERVAL_LABEL, 97), WHITE);
+                layoutY(RequesterLayoutDebug.Widget.INTERVAL_LABEL, 109), WHITE);
         int intervalX = layoutX(RequesterLayoutDebug.Widget.INTERVAL_INPUT, 8);
-        int intervalY = layoutY(RequesterLayoutDebug.Widget.INTERVAL_INPUT, 111);
+        int intervalY = layoutY(RequesterLayoutDebug.Widget.INTERVAL_INPUT, 123);
         RequesterTextures.input(g, leftPos + intervalX, topPos + intervalY, 96, 14,
                 intervalInput != null && intervalInput.isFocused());
         Component unit = Component.translatable(intervalUnit.key);
         int unitW = buttonWidth(unit, 20, 64);
         int unitX = screenX(RequesterLayoutDebug.Widget.INTERVAL_UNIT, 104);
-        int unitY = screenY(RequesterLayoutDebug.Widget.INTERVAL_UNIT, 109);
+        int unitY = screenY(RequesterLayoutDebug.Widget.INTERVAL_UNIT, 121);
         RequesterTextures.button(g, unitX, unitY, unitW, BUTTON_H,
                 inside(mx, my, unitX, unitY, unitW, BUTTON_H), true);
         drawCentered(g, unit.getString(),
                 layoutX(RequesterLayoutDebug.Widget.INTERVAL_UNIT, 104 + unitW / 2),
-                layoutY(RequesterLayoutDebug.Widget.INTERVAL_UNIT, 113), WHITE, unitW - 8);
+                layoutY(RequesterLayoutDebug.Widget.INTERVAL_UNIT, 125), WHITE, unitW - 8);
 
-        drawNotification(g, mx, my, RequesterLayoutDebug.Widget.ACTION_BAR_NOTIFICATION, 8, 130,
+        drawNotification(g, mx, my, RequesterLayoutDebug.Widget.ACTION_BAR_NOTIFICATION, 8, 139,
                 Component.translatable("qshop_requester.setting.action_bar"), menu.actionBar());
-        drawNotification(g, mx, my, RequesterLayoutDebug.Widget.CHAT_NOTIFICATION, 8, 144,
+        drawNotification(g, mx, my, RequesterLayoutDebug.Widget.CHAT_NOTIFICATION, 8, 152,
                 Component.translatable("qshop_requester.setting.chat"), menu.chat());
+    }
+
+    private void drawAvatar(GuiGraphics g, int x, int y, UUID owner) {
+        ResourceLocation skin = ResourceLocation.fromNamespaceAndPath(
+                "minecraft", "textures/entity/steve.png");
+        if (owner != null && Minecraft.getInstance().getConnection() != null) {
+            PlayerInfo info = Minecraft.getInstance().getConnection().getPlayerInfo(owner);
+            if (info != null) skin = info.getSkinLocation();
+        }
+        RenderSystem.setShader(GameRenderer::getPositionTexShader);
+        RenderSystem.setShaderTexture(0, skin);
+        g.blit(skin, x, y, 20, 20, 8, 8, 8, 8, 64, 64);
+        g.blit(skin, x, y, 20, 20, 40, 8, 8, 8, 64, 64);
     }
 
     private void renderDropdown(GuiGraphics g, int mx, int my) {
         int x = screenX(RequesterLayoutDebug.Widget.TARGET_BUTTON, 8);
-        int y = screenY(RequesterLayoutDebug.Widget.TARGET_BUTTON, 35);
+        int y = screenY(RequesterLayoutDebug.Widget.TARGET_BUTTON, 46);
         RequesterTextures.dropdown(g, x, y);
         drawText(g, Component.translatable("qshop_requester.target.dropdown"),
                 x - leftPos + 5, y - topPos + 4, WHITE);
@@ -433,11 +478,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     private void syncInputPosition() {
         if (searchInput != null) {
             searchInput.setX(screenX(RequesterLayoutDebug.Widget.SEARCH_INPUT, 10));
-            searchInput.setY(screenY(RequesterLayoutDebug.Widget.SEARCH_INPUT, 21));
+            searchInput.setY(screenY(RequesterLayoutDebug.Widget.SEARCH_INPUT, 32));
         }
         if (intervalInput != null) {
             intervalInput.setX(screenX(RequesterLayoutDebug.Widget.INTERVAL_INPUT, 10));
-            intervalInput.setY(screenY(RequesterLayoutDebug.Widget.INTERVAL_INPUT, 112));
+            intervalInput.setY(screenY(RequesterLayoutDebug.Widget.INTERVAL_INPUT, 124));
         }
     }
 
@@ -475,10 +520,20 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             setTab(1); return true;
         }
         if (tab == 1) {
+            Component claimLabel = Component.translatable("qshop_requester.owner.claim");
+            int claimWidth = buttonWidth(claimLabel, 20, 60);
+            int claimX = screenX(RequesterLayoutDebug.Widget.OWNER_BUTTON, 108);
+            int claimY = screenY(RequesterLayoutDebug.Widget.OWNER_BUTTON, 4);
+            if (inside(mx, my, claimX, claimY, claimWidth, BUTTON_H)) {
+                if (searchInput != null) searchInput.setFocused(false);
+                if (intervalInput != null) intervalInput.setFocused(false);
+                RequesterNetwork.sendClaimOwner(menu.pos());
+                return true;
+            }
             if (dropdown) {
                 if (handleSearchClick(mx, my, button)) return true;
                 int x = screenX(RequesterLayoutDebug.Widget.TARGET_BUTTON, 8);
-                int y = screenY(RequesterLayoutDebug.Widget.TARGET_BUTTON, 35);
+                int y = screenY(RequesterLayoutDebug.Widget.TARGET_BUTTON, 46);
                 int start = targetPage * 4;
                 List<RequesterNetwork.ShopInfo> visibleShops = filteredShops();
                 for (int i = 0; i < Math.min(4, visibleShops.size() - start); i++) {
@@ -489,7 +544,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 dropdown = false; return true;
             }
             int targetX = screenX(RequesterLayoutDebug.Widget.TARGET_BUTTON, 8);
-            int targetY = screenY(RequesterLayoutDebug.Widget.TARGET_BUTTON, 34);
+            int targetY = screenY(RequesterLayoutDebug.Widget.TARGET_BUTTON, 45);
             if (inside(mx, my, targetX, targetY, MAX_BUTTON_W, BUTTON_H)) {
                 if (searchInput != null) searchInput.setFocused(false);
                 if (intervalInput != null) intervalInput.setFocused(false);
@@ -498,15 +553,15 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             Component unit = Component.translatable(intervalUnit.key);
             int unitW = buttonWidth(unit, 20, 64);
             int unitX = screenX(RequesterLayoutDebug.Widget.INTERVAL_UNIT, 104);
-            int unitY = screenY(RequesterLayoutDebug.Widget.INTERVAL_UNIT, 109);
+            int unitY = screenY(RequesterLayoutDebug.Widget.INTERVAL_UNIT, 121);
             if (inside(mx, my, unitX, unitY, unitW, BUTTON_H)) { cycleUnit(); return true; }
             if (inside(mx, my, screenX(RequesterLayoutDebug.Widget.ACTION_BAR_NOTIFICATION, 8),
-                    screenY(RequesterLayoutDebug.Widget.ACTION_BAR_NOTIFICATION, 130), 160, 12)) {
+                    screenY(RequesterLayoutDebug.Widget.ACTION_BAR_NOTIFICATION, 139), 160, 12)) {
                 menu.setSettings(menu.intervalTicks(), !menu.actionBar(), menu.chat(), menu.enabled(),
                         menu.shopId(), menu.tabIndex(), menu.entryIndex()); sendSettings(); return true;
             }
             if (inside(mx, my, screenX(RequesterLayoutDebug.Widget.CHAT_NOTIFICATION, 8),
-                    screenY(RequesterLayoutDebug.Widget.CHAT_NOTIFICATION, 144), 160, 12)) {
+                    screenY(RequesterLayoutDebug.Widget.CHAT_NOTIFICATION, 152), 160, 12)) {
                 menu.setSettings(menu.intervalTicks(), menu.actionBar(), !menu.chat(), menu.enabled(),
                         menu.shopId(), menu.tabIndex(), menu.entryIndex()); sendSettings(); return true;
             }
@@ -611,7 +666,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     private boolean handleSearchClick(double mx, double my, int button) {
         int searchX = screenX(RequesterLayoutDebug.Widget.SEARCH_INPUT, 8);
-        int searchY = screenY(RequesterLayoutDebug.Widget.SEARCH_INPUT, 19);
+        int searchY = screenY(RequesterLayoutDebug.Widget.SEARCH_INPUT, 30);
         if (searchInput != null && inside(mx, my, searchX, searchY, 160, 14)
                 && searchInput.mouseClicked(mx, my, button)) {
             if (intervalInput != null) intervalInput.setFocused(false);
@@ -656,21 +711,32 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             x = leftPos + layoutX(widget, 98); y = topPos + layoutY(widget, 6);
             width = font.width(Component.translatable("qshop_requester.supply")); height = font.lineHeight;
         } else {
-            x = screenX(widget, 8);
+            x = screenX(widget, switch (widget) {
+                case OWNER_AVATAR -> 32;
+                case OWNER_INFO -> 56;
+                case OWNER_BUTTON -> 108;
+                default -> 8;
+            });
             y = screenY(widget, switch (widget) {
                 case SETTINGS_TITLE -> 6;
-                case SEARCH_INPUT -> 19;
-                case TARGET_BUTTON -> 34;
-                case SELECTED_INFO -> 51;
-                case INTERVAL_LABEL -> 97;
-                case INTERVAL_INPUT -> 111;
-                case INTERVAL_UNIT -> 109;
-                case ACTION_BAR_NOTIFICATION -> 130;
-                case CHAT_NOTIFICATION -> 144;
+                case OWNER_AVATAR -> 4;
+                case OWNER_INFO -> 7;
+                case OWNER_BUTTON -> 4;
+                case SEARCH_INPUT -> 30;
+                case TARGET_BUTTON -> 45;
+                case SELECTED_INFO -> 63;
+                case INTERVAL_LABEL -> 109;
+                case INTERVAL_INPUT -> 123;
+                case INTERVAL_UNIT -> 121;
+                case ACTION_BAR_NOTIFICATION -> 139;
+                case CHAT_NOTIFICATION -> 152;
                 default -> 0;
             });
             width = switch (widget) {
                 case SETTINGS_TITLE, INTERVAL_LABEL -> 120;
+                case OWNER_AVATAR -> 20;
+                case OWNER_INFO -> 120;
+                case OWNER_BUTTON -> 60;
                 case SEARCH_INPUT, TARGET_BUTTON -> 160;
                 case SELECTED_INFO -> 160;
                 case INTERVAL_INPUT -> 96;
@@ -680,8 +746,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             };
             height = switch (widget) {
                 case SETTINGS_TITLE, INTERVAL_LABEL -> font.lineHeight;
+                case OWNER_AVATAR -> 20;
+                case OWNER_INFO -> 24;
+                case OWNER_BUTTON, INTERVAL_UNIT, TARGET_BUTTON -> 16;
                 case SELECTED_INFO -> 42;
-                case INTERVAL_UNIT, TARGET_BUTTON -> 16;
                 default -> 14;
             };
         }

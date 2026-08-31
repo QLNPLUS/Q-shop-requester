@@ -39,6 +39,9 @@ public final class RequesterLayoutDebug {
         TAB_ITEMS("Items tab", -1),
         TAB_SETTINGS("Settings tab", -1),
         SETTINGS_TITLE("Settings title", 1),
+        OWNER_AVATAR("Owner avatar", 1),
+        OWNER_INFO("Owner name/status", 1),
+        OWNER_BUTTON("Claim owner button", 1),
         SEARCH_INPUT("Target search input", 1),
         TARGET_BUTTON("Target button", 1),
         SELECTED_INFO("Selected target info", 1),
@@ -126,6 +129,18 @@ public final class RequesterLayoutDebug {
     private static EnumMap<Widget, Position> defaults() {
         EnumMap<Widget, Position> values = new EnumMap<>(Widget.class);
         for (Widget widget : Widget.values()) values.put(widget, new Position(0, 0));
+        values.put(Widget.SETTINGS_TITLE, new Position(0, 1));
+        values.put(Widget.OWNER_AVATAR, new Position(-5, 3));
+        values.put(Widget.OWNER_INFO, new Position(-6, -1));
+        values.put(Widget.OWNER_BUTTON, new Position(-28, 5));
+        values.put(Widget.SEARCH_INPUT, new Position(0, 1));
+        values.put(Widget.TARGET_BUTTON, new Position(0, 2));
+        values.put(Widget.SELECTED_INFO, new Position(0, 1));
+        values.put(Widget.INTERVAL_LABEL, new Position(0, -1));
+        values.put(Widget.INTERVAL_INPUT, new Position(0, -4));
+        values.put(Widget.INTERVAL_UNIT, new Position(1, -3));
+        values.put(Widget.ACTION_BAR_NOTIFICATION, new Position(0, -4));
+        values.put(Widget.CHAT_NOTIFICATION, new Position(0, -3));
         return values;
     }
 

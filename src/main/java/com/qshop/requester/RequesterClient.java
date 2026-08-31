@@ -44,6 +44,7 @@ public final class RequesterClient {
                 && screen.getMenu().pos().equals(packet.pos())) {
             screen.getMenu().setSettings(packet.intervalTicks(), packet.actionBar(), packet.chat(),
                     packet.enabled(), packet.shopId(), packet.tabIndex(), packet.entryIndex());
+            screen.getMenu().setOwnerData(packet.owner(), packet.ownerName());
             screen.refreshIntervalInput();
         }
     }

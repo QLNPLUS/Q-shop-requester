@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.3.0] - 2026-08-31
+
+### Forge 1.20.1
+
+### Added
+
+- Restored requester ownership synchronization in the Forge client menu.
+- Added the owner avatar, name, online status, and Claim button to the settings page.
+- Added server-side claiming that transfers ownership to the player using the requester.
+- Added requester owner widgets to the Forge layout debug editor.
+
+### Changed
+
+- Bumped the Forge network protocol for the ownership payload.
+
 ## [1.1.1] - 2026-08-31
 
 ### Added

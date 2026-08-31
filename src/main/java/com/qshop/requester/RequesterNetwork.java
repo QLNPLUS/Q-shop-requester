@@ -12,6 +12,7 @@ import com.qshop.trade.RequirementCheck;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -24,10 +25,11 @@ import net.minecraftforge.network.simple.SimpleChannel;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Supplier;
 
 public final class RequesterNetwork {
-    private static final String PROTOCOL = "1";
+    private static final String PROTOCOL = "2";
     private static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(RequesterMod.MODID, "main"),
             () -> PROTOCOL, PROTOCOL::equals, PROTOCOL::equals);
@@ -38,6 +40,8 @@ public final class RequesterNetwork {
     public static void init() {
         CHANNEL.registerMessage(packetId++, SyncStatePacket.class,
                 SyncStatePacket::encode, SyncStatePacket::decode, SyncStatePacket::handle);
+        CHANNEL.registerMessage(packetId++, ClaimOwnerPacket.class,
+                ClaimOwnerPacket::encode, ClaimOwnerPacket::decode, ClaimOwnerPacket::handle);
         CHANNEL.registerMessage(packetId++, SyncShopsPacket.class,
                 SyncShopsPacket::encode, SyncShopsPacket::decode, SyncShopsPacket::handle);
         CHANNEL.registerMessage(packetId++, SetSettingsPacket.class,
@@ -50,7 +54,19 @@ public final class RequesterNetwork {
     public static void sendState(ServerPlayer player, RequesterBlockEntity box) {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncStatePacket(
                 box.getBlockPos(), box.intervalTicks(), box.showActionBarNotification(),
-                box.showChatNotification(), box.enabled(), box.shopId(), box.tabIndex(), box.entryIndex()));
+                box.showChatNotification(), box.enabled(), box.owner(), box.ownerName(),
+                box.shopId(), box.tabIndex(), box.entryIndex()));
+    }
+
+    public static void broadcastState(MinecraftServer server, RequesterBlockEntity box) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            if (player.distanceToSqr(box.getBlockPos().getX() + 0.5D,
+                    box.getBlockPos().getY() + 0.5D, box.getBlockPos().getZ() + 0.5D) <= 64D
+                    && player.containerMenu instanceof RequesterMenu menu
+                    && menu.pos().equals(box.getBlockPos())) {
+                sendState(player, box);
+            }
+        }
     }
 
     public static void sendShops(ServerPlayer player) {
@@ -169,21 +185,60 @@ public final class RequesterNetwork {
     }
 
     public record SyncStatePacket(BlockPos pos, int intervalTicks, boolean actionBar,
-                                  boolean chat, boolean enabled, String shopId,
+                                  boolean chat, boolean enabled, UUID owner, String ownerName,
+                                  String shopId,
                                   int tabIndex, int entryIndex) {
         public static void encode(SyncStatePacket p, FriendlyByteBuf b) {
             b.writeBlockPos(p.pos); b.writeVarInt(p.intervalTicks);
             b.writeBoolean(p.actionBar); b.writeBoolean(p.chat); b.writeBoolean(p.enabled);
+            b.writeBoolean(p.owner != null);
+            if (p.owner != null) b.writeUUID(p.owner);
+            b.writeUtf(p.ownerName == null ? "" : p.ownerName, 64);
             b.writeUtf(p.shopId == null ? "" : p.shopId, 128);
             b.writeVarInt(p.tabIndex); b.writeVarInt(p.entryIndex);
         }
         public static SyncStatePacket decode(FriendlyByteBuf b) {
-            return new SyncStatePacket(b.readBlockPos(), b.readVarInt(), b.readBoolean(),
-                    b.readBoolean(), b.readBoolean(), b.readUtf(128), b.readVarInt(), b.readVarInt());
+            BlockPos pos = b.readBlockPos();
+            int intervalTicks = b.readVarInt();
+            boolean actionBar = b.readBoolean();
+            boolean chat = b.readBoolean();
+            boolean enabled = b.readBoolean();
+            UUID owner = b.readBoolean() ? b.readUUID() : null;
+            String ownerName = b.readUtf(64);
+            return new SyncStatePacket(pos, intervalTicks, actionBar, chat, enabled,
+                    owner, ownerName, b.readUtf(128), b.readVarInt(), b.readVarInt());
         }
         public static void handle(SyncStatePacket p, Supplier<NetworkEvent.Context> supplier) {
             var context = supplier.get();
             context.enqueueWork(() -> enqueueClient(() -> RequesterClient.applyState(p)));
+            context.setPacketHandled(true);
+        }
+    }
+
+    public static void sendClaimOwner(BlockPos pos) {
+        CHANNEL.sendToServer(new ClaimOwnerPacket(pos));
+    }
+
+    public record ClaimOwnerPacket(BlockPos pos) {
+        public static void encode(ClaimOwnerPacket packet, FriendlyByteBuf buf) {
+            buf.writeBlockPos(packet.pos);
+        }
+
+        public static ClaimOwnerPacket decode(FriendlyByteBuf buf) {
+            return new ClaimOwnerPacket(buf.readBlockPos());
+        }
+
+        public static void handle(ClaimOwnerPacket packet, Supplier<NetworkEvent.Context> supplier) {
+            NetworkEvent.Context context = supplier.get();
+            ServerPlayer sender = context.getSender();
+            if (sender != null) {
+                context.enqueueWork(() -> {
+                    if (!(sender.serverLevel().getBlockEntity(packet.pos) instanceof RequesterBlockEntity box)
+                            || !box.stillValid(sender)) return;
+                    box.setOwner(sender.getUUID(), sender.getGameProfile().getName());
+                    broadcastState(sender.server, box);
+                });
+            }
             context.setPacketHandled(true);
         }
     }

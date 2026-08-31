@@ -110,7 +110,7 @@ jobs:
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           github-tag: ${{ env.RELEASE_VERSION }}
-          files: Q-shop-requester-neoforge-1.21.1/build/libs/qshop-requester-neoforge-1.21.1-*.jar
+          files: Q-shop-requester-neoforge-1.21.1/build/libs/qshop_requester-neoforge-1.21.1-*.jar
           version: ${{ env.CURSEFORGE_VERSION }}
           name: QShop Requester ${{ env.CURSEFORGE_VERSION }} NeoForge 1.21.1
           version-type: release

@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0] - 2026-09-01
+
+### Forge 1.20.1
+
+### Added
+
+- Added redstone control so any adjacent redstone signal pauses automatic purchases.
+- Added Chinese and English messages for every automatic trade failure status.
+
+### Fixed
+
+- Restored the trade interval input focus after selecting a shop entry.
+
 ## [1.3.0] - 2026-08-31
 
 ### Forge 1.20.1

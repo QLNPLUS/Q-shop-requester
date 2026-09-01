@@ -70,10 +70,14 @@ jobs:
             Q-shop/gradle.properties \
             Q-shop-requester-forge-1.20.1/gradle.properties
 
-      - name: Prepare CurseForge version
+      - name: Prepare Forge release version
+        id: prepare-forge-version
         env:
           RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
-        run: echo "CURSEFORGE_VERSION=${RELEASE_VERSION#v}" >> "$GITHUB_ENV"
+        run: |
+          version="${RELEASE_VERSION#v}"
+          echo "CURSEFORGE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Validate CurseForge configuration
         env:
@@ -98,6 +102,22 @@ jobs:
         run: |
           chmod +x Q-shop-requester-forge-1.20.1/gradlew
           (cd Q-shop-requester-forge-1.20.1 && ./gradlew build --no-daemon)
+
+      - name: Verify Forge release artifact
+        id: verify-forge-artifact
+        working-directory: Q-shop-requester-forge-1.20.1
+        env:
+          RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+        run: |
+          version="${RELEASE_VERSION#v}"
+          artifact="build/libs/qshop-requester-forge-1.20.1-${version}.jar"
+          test -f "$artifact" || {
+            echo "Missing expected Forge artifact: $artifact"
+            find build/libs -maxdepth 1 -type f -name '*.jar' -print
+            exit 1
+          }
+          echo "path=Q-shop-requester-forge-1.20.1/$artifact" >> "$GITHUB_OUTPUT"
+          echo "name=qshop-requester-forge-1.20.1-${version}" >> "$GITHUB_OUTPUT"
 
       - name: Prepare current Forge changelog
         working-directory: Q-shop-requester-forge-1.20.1
@@ -127,9 +147,9 @@ jobs:
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           github-tag: ${{ env.RELEASE_VERSION }}
-          files: Q-shop-requester-forge-1.20.1/build/libs/qshop-requester-forge-1.20.1-*.jar
-          version: ${{ env.CURSEFORGE_VERSION }}
-          name: QShop Requester ${{ env.CURSEFORGE_VERSION }} Forge 1.20.1
+          files: ${{ steps.verify-forge-artifact.outputs.path }}
+          version: ${{ steps.prepare-forge-version.outputs.version }}
+          name: ${{ steps.verify-forge-artifact.outputs.name }}
           version-type: release
           changelog-file: Q-shop-requester-forge-1.20.1/build/curseforge-changelog.md
           loaders: forge
@@ -169,10 +189,14 @@ jobs:
             Q-shop-neoforge-1.21.1/gradle.properties \
             Q-shop-requester-neoforge-1.21.1/gradle.properties
 
-      - name: Prepare CurseForge version
+      - name: Prepare NeoForge release version
+        id: prepare-neoforge-version
         env:
           RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
-        run: echo "CURSEFORGE_VERSION=${RELEASE_VERSION#v}" >> "$GITHUB_ENV"
+        run: |
+          version="${RELEASE_VERSION#v}"
+          echo "CURSEFORGE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Validate CurseForge configuration
         env:
@@ -197,6 +221,22 @@ jobs:
         run: |
           chmod +x Q-shop-requester-neoforge-1.21.1/gradlew
           (cd Q-shop-requester-neoforge-1.21.1 && ./gradlew build --no-daemon)
+
+      - name: Verify NeoForge release artifact
+        id: verify-neoforge-artifact
+        working-directory: Q-shop-requester-neoforge-1.21.1
+        env:
+          RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+        run: |
+          version="${RELEASE_VERSION#v}"
+          artifact="build/libs/qshop-requester-neoforge-1.21.1-${version}.jar"
+          test -f "$artifact" || {
+            echo "Missing expected NeoForge artifact: $artifact"
+            find build/libs -maxdepth 1 -type f -name '*.jar' -print
+            exit 1
+          }
+          echo "path=Q-shop-requester-neoforge-1.21.1/$artifact" >> "$GITHUB_OUTPUT"
+          echo "name=qshop-requester-neoforge-1.21.1-${version}" >> "$GITHUB_OUTPUT"
 
       - name: Prepare current NeoForge changelog
         working-directory: Q-shop-requester-neoforge-1.21.1
@@ -226,9 +266,9 @@ jobs:
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           github-tag: ${{ env.RELEASE_VERSION }}
-          files: Q-shop-requester-neoforge-1.21.1/build/libs/qshop_requester-neoforge-1.21.1-*.jar
-          version: ${{ env.CURSEFORGE_VERSION }}
-          name: QShop Requester ${{ env.CURSEFORGE_VERSION }} NeoForge 1.21.1
+          files: ${{ steps.verify-neoforge-artifact.outputs.path }}
+          version: ${{ steps.prepare-neoforge-version.outputs.version }}
+          name: ${{ steps.verify-neoforge-artifact.outputs.name }}
           version-type: release
           changelog-file: Q-shop-requester-neoforge-1.21.1/build/curseforge-changelog.md
           loaders: neoforge

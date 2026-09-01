@@ -86,7 +86,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         searchInput.setBordered(false);
         searchInput.setTextColor(WHITE);
         searchInput.setTextColorUneditable(WHITE);
-        searchInput.setVisible(false);
+        searchInput.setVisible(tab == 1);
         addRenderableWidget(searchInput);
         intervalInput = new LayeredEditBox(font, leftPos + 10, topPos + 124, 92, 12,
                 Component.translatable("qshop_requester.setting.interval_input"));
@@ -96,7 +96,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         intervalInput.setTextColor(WHITE);
         intervalInput.setTextColorUneditable(WHITE);
         intervalInput.setValue(Long.toString(intervalUnit.fromTicks(menu.intervalTicks())));
-        intervalInput.setVisible(false);
+        intervalInput.setVisible(tab == 1);
         addRenderableWidget(intervalInput);
     }
 

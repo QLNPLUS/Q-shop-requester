@@ -37,6 +37,18 @@
   "qshop_requester.message.shop_missing": "找不到商店: %s",
   "qshop_requester.message.trade_success": "自动收购完成: %s 件物品",
   "qshop_requester.message.trade_failed": "自动收购失败: %s",
+  "qshop_requester.message.failure.invalid_argument": "请求参数无效",
+  "qshop_requester.message.failure.shop_not_found": "找不到商店",
+  "qshop_requester.message.failure.tab_not_found": "找不到商店分类",
+  "qshop_requester.message.failure.entry_not_found": "找不到收购项目",
+  "qshop_requester.message.failure.unsupported_entry": "不支持的交易项目",
+  "qshop_requester.message.failure.requirements_not_met": "未满足交易条件",
+  "qshop_requester.message.failure.cancelled": "交易已取消",
+  "qshop_requester.message.failure.limit_reached": "已达到交易上限",
+  "qshop_requester.message.failure.not_enough_currency": "货币不足",
+  "qshop_requester.message.failure.not_enough_items": "提供的物品不足",
+  "qshop_requester.message.failure.no_space": "收购箱没有足够的空间",
+  "qshop_requester.message.failure.failed": "交易执行失败",
   "qshop_requester.message.offline": "归属者离线时继续自动交易",
   "qshop_requester.message.synced": "收购箱商店项目已刷新"
 }

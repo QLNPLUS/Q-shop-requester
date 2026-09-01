@@ -62,14 +62,18 @@ public final class RequesterService {
     private static void requestOnline(RequesterBlockEntity box, ServerPlayer owner) {
         RequesterTarget target = box.resolveTarget();
         if (target == null) {
-            notifyFailure(box, owner, "qshop_requester.message.no_target");
+            notifyFailure(box, owner, Component.translatable("qshop_requester.message.no_target"));
             return;
         }
         MinecraftServer server = owner.getServer();
         Shop shop = target.shop();
         ShopEntry entry = target.entry();
-        if (!validEntry(entry) || !RequirementCheck.satisfied(owner, entry)) {
-            notifyFailure(box, owner, TradeResult.Status.UNSUPPORTED_ENTRY.name());
+        if (!validEntry(entry)) {
+            notifyFailure(box, owner, failureReason(TradeResult.Status.UNSUPPORTED_ENTRY));
+            return;
+        }
+        if (!RequirementCheck.satisfied(owner, entry)) {
+            notifyFailure(box, owner, failureReason(TradeResult.Status.REQUIREMENTS_NOT_MET));
             return;
         }
 
@@ -89,7 +93,7 @@ public final class RequesterService {
                     target.tabIndex(), target.entryIndex());
         }
         if (result.isSuccess()) notifySuccess(box, owner, result.getTotalItems());
-        else notifyFailure(box, owner, result.getStatus().name());
+        else notifyFailure(box, owner, failureReason(result.getStatus()));
     }
 
     private static TradeResult tradeOffline(RequesterBlockEntity box, MinecraftServer server, UUID owner) {
@@ -501,6 +505,24 @@ public final class RequesterService {
         return TradeResult.failure(status, UNITS_PER_CYCLE, status.name());
     }
 
+    private static Component failureReason(TradeResult.Status status) {
+        String suffix = switch (status) {
+            case INVALID_ARGUMENT -> "invalid_argument";
+            case SHOP_NOT_FOUND -> "shop_not_found";
+            case TAB_NOT_FOUND -> "tab_not_found";
+            case ENTRY_NOT_FOUND -> "entry_not_found";
+            case UNSUPPORTED_ENTRY -> "unsupported_entry";
+            case REQUIREMENTS_NOT_MET -> "requirements_not_met";
+            case CANCELLED -> "cancelled";
+            case LIMIT_REACHED -> "limit_reached";
+            case NOT_ENOUGH_CURRENCY -> "not_enough_currency";
+            case NOT_ENOUGH_ITEMS -> "not_enough_items";
+            case NO_SPACE -> "no_space";
+            case FAILED, SUCCESS -> "failed";
+        };
+        return Component.translatable("qshop_requester.message.failure." + suffix);
+    }
+
     private static void notifySuccess(RequesterBlockEntity box, ServerPlayer owner, int totalItems) {
         if (box.showActionBarNotification()) owner.displayClientMessage(Component.translatable(
                 "qshop_requester.message.trade_success", totalItems), true);
@@ -508,7 +530,7 @@ public final class RequesterService {
                 "qshop_requester.message.trade_success", totalItems));
     }
 
-    private static void notifyFailure(RequesterBlockEntity box, ServerPlayer owner, String reason) {
+    private static void notifyFailure(RequesterBlockEntity box, ServerPlayer owner, Component reason) {
         Component message = Component.translatable("qshop_requester.message.trade_failed", reason);
         if (box.showActionBarNotification()) owner.displayClientMessage(message, true);
         if (box.showChatNotification()) owner.sendSystemMessage(message);

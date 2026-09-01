@@ -48,7 +48,8 @@ public final class RequesterBlockEntity extends BlockEntity {
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, RequesterBlockEntity box) {
-        if (!(level.getServer() != null) || level.isClientSide || !box.enabled) return;
+        if (!(level.getServer() != null) || level.isClientSide || !box.enabled
+                || level.hasNeighborSignal(pos)) return;
         long now = level.getGameTime();
         if (box.nextTradeTick < 0L) {
             box.nextTradeTick = now + box.intervalTicks;

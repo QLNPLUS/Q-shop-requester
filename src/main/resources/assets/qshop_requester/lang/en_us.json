@@ -37,6 +37,18 @@
   "qshop_requester.message.shop_missing": "Shop not found: %s",
   "qshop_requester.message.trade_success": "Automatic purchase completed: %s items",
   "qshop_requester.message.trade_failed": "Automatic purchase failed: %s",
+  "qshop_requester.message.failure.invalid_argument": "The request arguments are invalid",
+  "qshop_requester.message.failure.shop_not_found": "Shop not found",
+  "qshop_requester.message.failure.tab_not_found": "Shop tab not found",
+  "qshop_requester.message.failure.entry_not_found": "Shop entry not found",
+  "qshop_requester.message.failure.unsupported_entry": "Unsupported shop entry",
+  "qshop_requester.message.failure.requirements_not_met": "Trade requirements are not met",
+  "qshop_requester.message.failure.cancelled": "The trade was cancelled",
+  "qshop_requester.message.failure.limit_reached": "The trade limit has been reached",
+  "qshop_requester.message.failure.not_enough_currency": "Not enough currency",
+  "qshop_requester.message.failure.not_enough_items": "Not enough supplied items",
+  "qshop_requester.message.failure.no_space": "The requester has no room for the purchase",
+  "qshop_requester.message.failure.failed": "The trade could not be completed",
   "qshop_requester.message.offline": "Automatic trading continues while the owner is offline",
   "qshop_requester.message.synced": "Requester shop entries refreshed"
 }

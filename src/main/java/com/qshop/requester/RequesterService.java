@@ -301,9 +301,20 @@ public final class RequesterService {
                     net.minecraft.server.permissions.PermissionSet perms = command.op
                             ? net.minecraft.server.permissions.LevelBasedPermissionSet.OWNER
                             : net.minecraft.server.permissions.LevelBasedPermissionSet.ALL;
+                    // 26.1.2:ServerPlayer/Entity 不再实现 CommandSource,而构造器首参
+                    // 要求 CommandSource。CommandSource 只有 4 个方法,这里内联实现,
+                    // 把消息转发给该玩家(silent 由 withSuppressedOutput 另行处理)。
+                    net.minecraft.commands.CommandSource ownerSource = new net.minecraft.commands.CommandSource() {
+                        @Override public void sendSystemMessage(Component message) {
+                            onlineOwner.sendSystemMessage(message);
+                        }
+                        @Override public boolean acceptsSuccess() { return true; }
+                        @Override public boolean acceptsFailure() { return true; }
+                        @Override public boolean shouldInformAdmins() { return false; }
+                    };
                     CommandSourceStack source = onlineOwner == null
                             ? server.createCommandSourceStack().withPermission(perms)
-                            : new CommandSourceStack(onlineOwner, onlineOwner.position(),
+                            : new CommandSourceStack(ownerSource, onlineOwner.position(),
                             onlineOwner.getRotationVector(), onlineOwner.level(),
                             perms, playerName, onlineOwner.getDisplayName(), server, onlineOwner);
                     if (command.silent) source = source.withSuppressedOutput();

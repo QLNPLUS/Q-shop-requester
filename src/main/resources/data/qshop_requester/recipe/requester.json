@@ -1,17 +1,14 @@
 {
   "type": "minecraft:crafting_shaped",
+  "category": "misc",
   "pattern": [
     " I ",
     " B ",
     " I "
   ],
   "key": {
-    "I": {
-      "item": "minecraft:iron_ingot"
-    },
-    "B": {
-      "item": "minecraft:barrel"
-    }
+    "I": "minecraft:iron_ingot",
+    "B": "minecraft:barrel"
   },
   "result": {
     "id": "qshop_requester:requester",

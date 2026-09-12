@@ -89,6 +89,40 @@ git -C D:\projects\q_shop_requester\<目标worktree> cherry-pick -x <源分支SH
 
 **本项目的 GUI 代码是 `RequesterScreen.java`(778 LOC)+ `RequesterTextures.java` + `RequesterLayoutDebug.java`**,是 26.1.2 适配的主要工作量所在。
 
+## 跨仓库编译依赖(最容易踩的坑)
+
+**本项目不是自包含的:它编译时要引用 QShop 主模组(`com.qshop.shop.*`、`com.qshop.net.*`、`com.qshop.client.ShopScreen` 等)。**
+
+`build.gradle` 里使用的是一条**指向兄弟目录的相对路径**:
+
+| 分支 | 依赖声明 |
+|---|---|
+| `forge-1.20.1` | `compileOnly fg.deobf(files('../Q-shop-forge-1.20.1/build/libs/qshop-forge-1.20.1-1.2.4.jar'))` |
+| `neoforge-1.21.1` | `compileOnly files('../Q-shop-neoforge-1.21.1/build/libs/qshop-neoforge-1.21.1-1.2.4.jar')` |
+
+**CI 能工作**是因为 workflow 把两个仓库并排 checkout:
+
+```yaml
+- uses: actions/checkout@v4
+  with: { repository: QLNPLUS/Q-shop, ref: neoforge-1.21.1, path: Q-shop-neoforge-1.21.1 }
+- uses: actions/checkout@v4
+  with: { ref: ..., path: Q-shop-requester-neoforge-1.21.1 }
+```
+
+于是那个相对路径正好命中。
+
+**本地布局下它会失效**,因为 QShop 主模组现在是**另一个项目文件夹**(`D:\projects\q_shop\...`),不再是本项目的兄弟目录。
+
+**因此:本地跑构建前,必须先确认那条路径能解析到真实的 jar。** 两种处置:
+
+- 把 QShop 主模组对应分支的 jar 放到该相对路径上,或
+- 用 `-P` 覆盖依赖路径(若已改为可配置),例如
+  `.\gradlew.bat build -PqshopJar=D:/projects/q_shop/neoforge-1.21.1/build/libs/qshop-neoforge-1.21.1-1.6.2.jar`
+
+**注意版本号 1.2.4**:依赖声明写死的是 `1.2.4`,而 QShop 主模组已发布到 `1.6.2`。本地构建前需要确认用哪个版本的 QShop jar —— 换版本可能因 API 变化而编译失败。**不要在没有验证的情况下把版本号改大。**
+
+**改动这条依赖路径或版本号时,必须同步检查 CI workflow** —— 分支名与路径都是 CI 的契约。
+
 ## Release Tag
 
 格式:**`v<version>-<loader>-<mcversion>`**,前缀统一用 `v`:

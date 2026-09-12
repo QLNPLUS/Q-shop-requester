@@ -184,15 +184,16 @@ public final class RequesterBlockEntity extends BlockEntity {
     }
 
 
+    // 26.1.2 的 ValueOutput/ValueInput 没有 putUUID/hasUUID/getUUID,改用 Minecraft
+    // 自带的 UUIDUtil.CODEC(Codec.INT_STREAM,即 4 个 int)。这与旧版
+    // CompoundTag.putUUID 写入的 IntArrayTag 表示一致,因此存档格式不变、
+    // 已放置的方块仍能读回 owner。
     private static void putUuid(ValueOutput tag, String name, UUID value) {
-        tag.putLong(name + "Hi", value.getMostSignificantBits());
-        tag.putLong(name + "Lo", value.getLeastSignificantBits());
+        tag.store(name, net.minecraft.core.UUIDUtil.CODEC, value);
     }
 
     private static UUID readUuid(ValueInput tag, String name) {
-        long hi = tag.getLongOr(name + "Hi", 0L);
-        long lo = tag.getLongOr(name + "Lo", 0L);
-        return (hi == 0L && lo == 0L) ? null : new UUID(hi, lo);
+        return tag.read(name, net.minecraft.core.UUIDUtil.CODEC).orElse(null);
     }
 
     private static String bounded(String value) {

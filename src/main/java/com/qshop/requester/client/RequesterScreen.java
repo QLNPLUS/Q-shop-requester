@@ -8,7 +8,6 @@ import com.qshop.requester.RequesterClient;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.multiplayer.PlayerInfo;
@@ -60,10 +59,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         private LayeredEditBox(Font font, int x, int y, int width, int height, Component message) {
             super(font, x, y, width, height, message);
         }
-        private void renderManual(GuiGraphics g, int mx, int my, float partial) {
+        private void renderManual(GuiGraphicsExtractor g, int mx, int my, float partial) {
             manualRender = true; render(g, mx, my, partial); manualRender = false;
         }
-        @Override public void renderWidget(GuiGraphics g, int mx, int my, float partial) {
+        @Override public void renderWidget(GuiGraphicsExtractor g, int mx, int my, float partial) {
             if (manualRender) super.renderWidget(g, mx, my, partial);
         }
     }
@@ -122,7 +121,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         dropdown = tab == 1 && searchInput != null && !filteredShops().isEmpty();
     }
 
-    @Override protected void renderBg(GuiGraphics g, float partial, int mx, int my) {
+    @Override protected void renderBg(GuiGraphicsExtractor g, float partial, int mx, int my) {
         // Match Q-shop sellbox: unselected tabs sit behind the page background.
         for (int page = 0; page < 2; page++) {
             if (page != tab) {
@@ -134,12 +133,12 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         RequesterTextures.background(g, leftPos, topPos);
     }
 
-    @Override public void renderBackground(GuiGraphics g, int mx, int my, float partial) {
+    @Override public void renderBackground(GuiGraphicsExtractor g, int mx, int my, float partial) {
         g.fill(0, 0, this.width, this.height, 0x66000000);
         renderBg(g, partial, mx, my);
     }
 
-    @Override protected void renderLabels(GuiGraphics g, int mx, int my) {
+    @Override protected void renderLabels(GuiGraphicsExtractor g, int mx, int my) {
         if (tab != 0) return;
         g.drawString(font, Component.translatable("qshop_requester.purchase"),
                 layoutX(RequesterLayoutDebug.Widget.ITEM_PURCHASE_TITLE, 8),
@@ -152,7 +151,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 layoutY(RequesterLayoutDebug.Widget.ITEM_INVENTORY, inventoryLabelY - 1), DARK, false);
     }
 
-    @Override public void render(GuiGraphics g, int mx, int my, float partial) {
+    @Override public void render(GuiGraphicsExtractor g, int mx, int my, float partial) {
         syncInputPosition();
         if (tab == 0) {
             super.render(g, mx, my, partial);
@@ -162,8 +161,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             g.flush();
         }
 
-        g.pose().pushPose();
-        g.pose().translate(0, 0, 300);
+        g.pose().pushMatrix();
+        g.nextStratum();
         if (tab == 1) {
             // Put the opaque settings page over the base container page, then
             // draw the selected tab on top of it like Q-shop sellbox.
@@ -172,50 +171,50 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             renderSettings(g, mx, my);
         }
         renderSelectedTab(g);
-        g.pose().popPose();
+        g.pose().popMatrix();
 
         if (tab == 1 && searchInput != null) {
-            g.pose().pushPose();
-            g.pose().translate(0, 0, 400);
+            g.pose().pushMatrix();
+            g.nextStratum();
             searchInput.renderManual(g, mx, my, partial);
             g.flush();
-            g.pose().popPose();
+            g.pose().popMatrix();
         }
         if (tab == 1 && intervalInput != null) {
-            g.pose().pushPose();
-            g.pose().translate(0, 0, 400);
+            g.pose().pushMatrix();
+            g.nextStratum();
             intervalInput.renderManual(g, mx, my, partial);
             g.flush();
-            g.pose().popPose();
+            g.pose().popMatrix();
         }
         if (dropdown) {
-            g.pose().pushPose();
-            g.pose().translate(0, 0, 600);
+            g.pose().pushMatrix();
+            g.nextStratum();
             renderDropdown(g, mx, my);
             flushAll(g);
-            g.pose().popPose();
+            g.pose().popMatrix();
         }
         if (tab == 0) {
-            g.pose().pushPose();
-            g.pose().translate(0, 0, 700);
+            g.pose().pushMatrix();
+            g.nextStratum();
             super.renderTooltip(g, mx, my);
             g.flush();
-            g.pose().popPose();
+            g.pose().popMatrix();
         }
         renderDebugOverlay(g);
     }
 
-    private void renderSelectedTab(GuiGraphics g) {
+    private void renderSelectedTab(GuiGraphicsExtractor g) {
         RequesterTextures.tab(g, tabX(tab), tabY(tab), tab, true);
-        g.pose().pushPose();
-        g.pose().translate(0, 0, 100);
+        g.pose().pushMatrix();
+        g.nextStratum();
         g.item(RequesterMod.REQUESTER_ITEM.get().getDefaultInstance(),
                 screenX(RequesterLayoutDebug.Widget.TAB_ITEMS, 5),
                 screenY(RequesterLayoutDebug.Widget.TAB_ITEMS, -20));
         g.item(new ItemStack(Items.COMPARATOR),
                 screenX(RequesterLayoutDebug.Widget.TAB_SETTINGS, 32),
                 screenY(RequesterLayoutDebug.Widget.TAB_SETTINGS, -20));
-        g.pose().popPose();
+        g.pose().popMatrix();
         flushAll(g);
     }
 
@@ -231,7 +230,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 : screenY(RequesterLayoutDebug.Widget.TAB_SETTINGS, -28);
     }
 
-    private void renderSettings(GuiGraphics g, int mx, int my) {
+    private void renderSettings(GuiGraphicsExtractor g, int mx, int my) {
         drawText(g, Component.translatable("qshop_requester.tab.settings"),
                 layoutX(RequesterLayoutDebug.Widget.SETTINGS_TITLE, 8),
                 layoutY(RequesterLayoutDebug.Widget.SETTINGS_TITLE, 6), WHITE);
@@ -313,7 +312,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 Component.translatable("qshop_requester.setting.chat"), menu.chat());
     }
 
-    private void drawAvatar(GuiGraphics g, int x, int y, UUID owner) {
+    private void drawAvatar(GuiGraphicsExtractor g, int x, int y, UUID owner) {
         ResourceLocation skin = ResourceLocation.fromNamespaceAndPath(
                 "minecraft", "textures/entity/steve.png");
         if (owner != null && Minecraft.getInstance().getConnection() != null) {
@@ -326,7 +325,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         g.blit(skin, x, y, 20, 20, 40, 8, 8, 8, 64, 64);
     }
 
-    private void renderDropdown(GuiGraphics g, int mx, int my) {
+    private void renderDropdown(GuiGraphicsExtractor g, int mx, int my) {
         int x = screenX(RequesterLayoutDebug.Widget.TARGET_BUTTON, 8);
         int y = screenY(RequesterLayoutDebug.Widget.TARGET_BUTTON, 46);
         RequesterTextures.dropdown(g, x, y);
@@ -380,7 +379,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         return result.toString();
     }
 
-    private void drawScrollingText(GuiGraphics g, String text, int x, int y, int width) {
+    private void drawScrollingText(GuiGraphicsExtractor g, String text, int x, int y, int width) {
         int textWidth = font.width(text);
         if (textWidth <= width) {
             g.drawString(font, Component.literal(text), x, y, WHITE, true);
@@ -400,7 +399,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         g.disableScissor();
     }
 
-    private void drawNotification(GuiGraphics g, int mx, int my,
+    private void drawNotification(GuiGraphicsExtractor g, int mx, int my,
                                   RequesterLayoutDebug.Widget widget, int x, int y,
                                   Component label, boolean checked) {
         int sx = screenX(widget, x), sy = screenY(widget, y);
@@ -658,7 +657,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         super.mouseMoved(mx, my);
     }
 
-    @Override protected void renderTooltip(GuiGraphics g, int mx, int my) {
+    @Override protected void renderTooltip(GuiGraphicsExtractor g, int mx, int my) {
         // Do not allow EMI or vanilla tooltip callbacks to leak into the
         // settings page after its item panel has been hidden.
         if (tab == 1) return;
@@ -671,10 +670,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         super.removed();
     }
 
-    private void drawText(GuiGraphics g, Component text, int x, int y, int color) {
+    private void drawText(GuiGraphicsExtractor g, Component text, int x, int y, int color) {
         g.drawString(font, text, leftPos + x, topPos + y, color, true);
     }
-    private void drawText(GuiGraphics g, String text, int x, int y, int color) {
+    private void drawText(GuiGraphicsExtractor g, String text, int x, int y, int color) {
         drawText(g, Component.literal(text), x, y, color);
     }
 
@@ -691,7 +690,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         return false;
     }
 
-    private void drawCentered(GuiGraphics g, String text, int x, int y, int color, int maxWidth) {
+    private void drawCentered(GuiGraphicsExtractor g, String text, int x, int y, int color, int maxWidth) {
         String value = font.plainSubstrByWidth(text, Math.max(1, maxWidth));
         g.drawString(font, value, leftPos + x - font.width(value) / 2, topPos + y, color, true);
     }
@@ -700,11 +699,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     private static boolean inside(double mx, double my, int x, int y, int w, int h) {
         return mx >= x && mx < x + w && my >= y && my < y + h;
     }
-    private static void flushAll(GuiGraphics g) {
+    private static void flushAll(GuiGraphicsExtractor g) {
         g.flush(); Minecraft.getInstance().renderBuffers().bufferSource().endBatch();
     }
 
-    private void renderDebugOverlay(GuiGraphics g) {
+    private void renderDebugOverlay(GuiGraphicsExtractor g) {
         if (!RequesterLayoutDebug.isEnabled()) return;
         RequesterLayoutDebug.Widget widget = RequesterLayoutDebug.selected();
         int x;
@@ -766,11 +765,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 default -> 14;
             };
         }
-        g.pose().pushPose();
-        g.pose().translate(0, 0, 900);
+        g.pose().pushMatrix();
+        g.nextStratum();
         RequesterLayoutDebug.renderOverlay(g, font, x, y, width, height);
         flushAll(g);
-        g.pose().popPose();
+        g.pose().popMatrix();
     }
 
     private int layoutX(RequesterLayoutDebug.Widget widget, int normal) {

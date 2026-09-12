@@ -71,7 +71,9 @@ public final class RequesterBlock extends BaseEntityBlock {
             ItemStack stack, BlockState state, Level level, BlockPos pos, Player player,
             InteractionHand hand, BlockHitResult hit) {
         useWithoutItem(state, level, pos, player, hit);
-        return InteractionResult.sidedSuccess(level.isClientSide());
+        // 26.1.2:sidedSuccess(boolean) 已移除,InteractionResult 改为 sealed interface。
+        // 与原语义等价:客户端 SUCCESS(摆臂在客户端),服务端 SUCCESS_SERVER(摆臂在服务端)。
+        return level.isClientSide() ? InteractionResult.SUCCESS : InteractionResult.SUCCESS_SERVER;
     }
 
     @Override public <T extends BlockEntity> BlockEntityTicker<T> getTicker(
@@ -80,9 +82,12 @@ public final class RequesterBlock extends BaseEntityBlock {
                 RequesterMod.REQUESTER_ENTITY.get(), RequesterBlockEntity::serverTick);
     }
 
-    @Override public void onRemove(BlockState state, Level level, BlockPos pos,
-                                   BlockState newState, boolean moved) {
-        if (!state.is(newState.getBlock())
+    // 26.1.2:onRemove(BlockState, Level, BlockPos, BlockState, boolean) 已被
+    // affectNeighborsAfterRemoval(BlockState, ServerLevel, BlockPos, boolean) 取代。
+    // 参数由 Level 收窄为 ServerLevel,boolean 语义由 moved 变为 isMoving。
+    @Override protected void affectNeighborsAfterRemoval(BlockState state, net.minecraft.server.level.ServerLevel level,
+                                                         BlockPos pos, boolean isMoving) {
+        if (!state.is(level.getBlockState(pos).getBlock())
                 && level.getBlockEntity(pos) instanceof RequesterBlockEntity box) {
             for (int slot = 0; slot < box.purchased().getSlots(); slot++) {
                 drop(level, pos, box.purchased().extractItem(slot,
@@ -94,7 +99,7 @@ public final class RequesterBlock extends BaseEntityBlock {
             }
             level.removeBlockEntity(pos);
         }
-        super.onRemove(state, level, pos, newState, moved);
+        super.affectNeighborsAfterRemoval(state, level, pos, isMoving);
     }
 
     private static void drop(Level level, BlockPos pos, ItemStack stack) {

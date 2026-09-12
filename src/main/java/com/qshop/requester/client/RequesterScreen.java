@@ -68,9 +68,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     }
 
     public RequesterScreen(RequesterMenu menu, Inventory inventory, Component title) {
-        super(menu, inventory, title);
-        imageWidth = 176;
-        imageHeight = 166;
+        // 26.1.2:imageWidth/imageHeight 在 AbstractContainerScreen 里已是 final,
+        // 不能再在构造器体内赋值,改由带尺寸的父类构造器传入。
+        super(menu, inventory, title, 176, 166);
         inventoryLabelY = 74;
     }
 
@@ -513,9 +513,14 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         sendSettings();
     }
 
-    @Override public boolean mouseClicked(double mx, double my, int button) {
+    // 26.1.2:输入事件改为记录类型(MouseButtonEvent/KeyEvent/CharacterEvent),
+    // 不再逐个传 (x, y, button) 或 (keyCode, scanCode, modifiers)。
+    @Override public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubled) {
+        double mx = event.x();
+        double my = event.y();
+        int button = event.button();
         syncInputPosition();
-        if (button != 0) return tab == 0 ? super.mouseClicked(mx, my, button) : true;
+        if (button != 0) return tab == 0 ? super.mouseClicked(event, doubled) : true;
         if (inside(mx, my, screenX(RequesterLayoutDebug.Widget.TAB_ITEMS, 0),
                 screenY(RequesterLayoutDebug.Widget.TAB_ITEMS, -28), 26, 32)) {
             setTab(0); return true;
@@ -571,19 +576,22 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                         menu.shopUuid(), menu.tabUuid(), menu.entryUuid()); sendSettings(); return true;
             }
             if (handleSearchClick(mx, my, button)) return true;
-            if (intervalInput != null && intervalInput.mouseClicked(mx, my, button)) {
+            if (intervalInput != null && intervalInput.mouseClicked(event, doubled)) {
                 if (searchInput != null) searchInput.setFocused(false);
                 intervalInput.setFocused(true); return true;
             }
             return true;
         }
-        return super.mouseClicked(mx, my, button);
+        return super.mouseClicked(event, doubled);
     }
 
-    @Override public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    @Override public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+        int keyCode = event.key();
+        int scanCode = event.scancode();
+        int modifiers = event.modifiers();
         if (keyCode == GLFW.GLFW_KEY_F8) {
             if (!RequesterLayoutDebug.isConfiguredEnabled()) {
-                return super.keyPressed(keyCode, scanCode, modifiers);
+                return super.keyPressed(event);
             }
             RequesterLayoutDebug.toggle();
             RequesterLayoutDebug.ensureSelected(tab);

@@ -3,6 +3,8 @@ package com.qshop.requester;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -48,7 +50,7 @@ public final class RequesterBlockEntity extends BlockEntity {
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, RequesterBlockEntity box) {
-        if (!(level.getServer() != null) || level.isClientSide || !box.enabled
+        if (!(level.getServer() != null) || level.isClientSide() || !box.enabled
                 || level.hasNeighborSignal(pos)) return;
         long now = level.getGameTime();
         if (box.nextTradeTick < 0L) {
@@ -112,7 +114,7 @@ public final class RequesterBlockEntity extends BlockEntity {
     }
 
     public boolean canEdit(Player player) {
-        return player.hasPermissions(2) || owner != null && owner.equals(player.getUUID());
+        return player.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER) || owner != null && owner.equals(player.getUUID());
     }
 
     public boolean stillValid(Player player) {
@@ -138,11 +140,14 @@ public final class RequesterBlockEntity extends BlockEntity {
         if (level != null) level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
     }
 
-    @Override protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.saveAdditional(tag, registries);
-        tag.put("purchased", purchased.serializeNBT(registries));
-        tag.put("supplied", supplied.serializeNBT(registries));
-        if (owner != null) tag.putUUID("owner", owner);
+    // 26.1.2:saveAdditional/loadAdditional 改用 ValueOutput/ValueInput,不再暴露 CompoundTag。
+    // ItemStackHandler 在 26.1.2 实现了 ValueIOSerializable(serialize/deserialize),
+    // 直接委托给它,无需字节转换。UUID 存成两个 long,避免引入 Codec。
+    @Override protected void saveAdditional(ValueOutput tag) {
+        super.saveAdditional(tag);
+        purchased.serialize(tag.child("purchased"));
+        supplied.serialize(tag.child("supplied"));
+        if (owner != null) putUuid(tag, "owner", owner);
         tag.putString("ownerName", ownerName);
         tag.putInt("intervalTicks", intervalTicks);
         tag.putBoolean("actionBar", actionBarNotifications);
@@ -159,24 +164,35 @@ public final class RequesterBlockEntity extends BlockEntity {
         if (nextTradeTick >= 0L) tag.putLong("nextTradeTick", nextTradeTick);
     }
 
-    @Override public void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.loadAdditional(tag, registries);
-        if (tag.contains("purchased")) purchased.deserializeNBT(registries, tag.getCompound("purchased"));
-        if (tag.contains("supplied")) supplied.deserializeNBT(registries, tag.getCompound("supplied"));
-        owner = tag.hasUUID("owner") ? tag.getUUID("owner") : null;
-        ownerName = tag.getString("ownerName");
-        intervalTicks = Math.max(20, Math.min(tag.getInt("intervalTicks"), MAX_INTERVAL_TICKS));
-        if (!tag.contains("intervalTicks")) intervalTicks = DEFAULT_INTERVAL_TICKS;
-        actionBarNotifications = !tag.contains("actionBar") || tag.getBoolean("actionBar");
-        chatNotifications = !tag.contains("chat") || tag.getBoolean("chat");
-        enabled = !tag.contains("enabled") || tag.getBoolean("enabled");
-        shopUuid = tag.getString("shopUuid");
-        tabUuid = tag.getString("tabUuid");
-        entryUuid = tag.getString("entryUuid");
-        legacyShopId = tag.getString("shopId");
-        legacyTabIndex = Math.max(0, tag.getInt("tabIndex"));
-        legacyEntryIndex = Math.max(0, tag.getInt("entryIndex"));
-        nextTradeTick = tag.contains("nextTradeTick") ? tag.getLong("nextTradeTick") : -1L;
+    @Override public void loadAdditional(ValueInput tag) {
+        super.loadAdditional(tag);
+        tag.child("purchased").ifPresent(purchased::deserialize);
+        tag.child("supplied").ifPresent(supplied::deserialize);
+        owner = readUuid(tag, "owner");
+        ownerName = tag.getStringOr("ownerName", "");
+        intervalTicks = Math.max(20, Math.min(tag.getIntOr("intervalTicks", DEFAULT_INTERVAL_TICKS), MAX_INTERVAL_TICKS));
+        actionBarNotifications = tag.getBooleanOr("actionBar", true);
+        chatNotifications = tag.getBooleanOr("chat", true);
+        enabled = tag.getBooleanOr("enabled", true);
+        shopUuid = tag.getStringOr("shopUuid", "");
+        tabUuid = tag.getStringOr("tabUuid", "");
+        entryUuid = tag.getStringOr("entryUuid", "");
+        legacyShopId = tag.getStringOr("shopId", "");
+        legacyTabIndex = Math.max(0, tag.getIntOr("tabIndex", 0));
+        legacyEntryIndex = Math.max(0, tag.getIntOr("entryIndex", 0));
+        nextTradeTick = tag.getLongOr("nextTradeTick", -1L);
+    }
+
+
+    private static void putUuid(ValueOutput tag, String name, UUID value) {
+        tag.putLong(name + "Hi", value.getMostSignificantBits());
+        tag.putLong(name + "Lo", value.getLeastSignificantBits());
+    }
+
+    private static UUID readUuid(ValueInput tag, String name) {
+        long hi = tag.getLongOr(name + "Hi", 0L);
+        long lo = tag.getLongOr(name + "Lo", 0L);
+        return (hi == 0L && lo == 0L) ? null : new UUID(hi, lo);
     }
 
     private static String bounded(String value) {

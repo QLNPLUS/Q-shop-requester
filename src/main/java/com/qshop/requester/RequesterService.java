@@ -19,7 +19,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
@@ -37,7 +37,7 @@ import java.util.List;
 import java.util.UUID;
 
 public final class RequesterService {
-    public static final ResourceLocation SOURCE = ResourceLocation.fromNamespaceAndPath(
+    public static final Identifier SOURCE = Identifier.fromNamespaceAndPath(
             RequesterMod.MODID, "auto_request");
     private static final int UNITS_PER_CYCLE = 1;
     private static final String FORGE_CAPS_KEY = "ForgeCaps";
@@ -65,7 +65,7 @@ public final class RequesterService {
             notifyFailure(box, owner, Component.translatable("qshop_requester.message.no_target"));
             return;
         }
-        MinecraftServer server = owner.getServer();
+        MinecraftServer server = owner.level().getServer();
         Shop shop = target.shop();
         ShopEntry entry = target.entry();
         if (!validEntry(entry)) {
@@ -272,8 +272,8 @@ public final class RequesterService {
     private static void executeCommands(MinecraftServer server, ServerPlayer onlineOwner, UUID owner,
                                         Shop shop, int entryIndex, ShopEntry entry, int units) {
         String playerName = onlineOwner == null
-                ? server.getProfileCache().get(owner).map(profile -> profile.getName()).orElse(owner.toString())
-                : onlineOwner.getGameProfile().getName();
+                ? owner.toString()
+                : onlineOwner.getPlainTextName();
         int commandRuns = entry.type == ShopEntryType.COMMAND ? units : 1;
         int commandUnits = entry.type == ShopEntryType.COMMAND ? 1 : units;
         int commandItems = entry.type == ShopEntryType.COMMAND
@@ -298,7 +298,7 @@ public final class RequesterService {
                     CommandSourceStack source = onlineOwner == null
                             ? server.createCommandSourceStack().withPermission(command.op ? 4 : 0)
                             : new CommandSourceStack(onlineOwner, onlineOwner.position(),
-                            onlineOwner.getRotationVector(), onlineOwner.serverLevel(),
+                            onlineOwner.getRotationVector(), onlineOwner.level(),
                             command.op ? 4 : 0, playerName, onlineOwner.getDisplayName(), server, onlineOwner);
                     if (command.silent) source = source.withSuppressedOutput();
                     server.getCommands().performPrefixedCommand(source, text);

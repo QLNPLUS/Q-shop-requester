@@ -173,11 +173,11 @@ public final class RequesterNetwork {
                 : shop.id + "|" + tabIndex + "|" + entryIndex;
         String period = entry.reset.periodKey();
         if (entry.globalLimit > 0) {
-            int used = QShopSavedData.get(player.getServer()).globalCounts.getCount(key, period);
+            int used = QShopSavedData.get(player.level().getServer()).globalCounts.getCount(key, period);
             if (entry.globalLimit - used < 1) return false;
         }
         if (entry.playerLimit > 0) {
-            int used = CurrencyService.INSTANCE.getLimitCount(player.getServer(), player.getUUID(), key, period);
+            int used = CurrencyService.INSTANCE.getLimitCount(player.level().getServer(), player.getUUID(), key, period);
             if (entry.playerLimit - used < 1) {
                 return false;
             }
@@ -190,7 +190,7 @@ public final class RequesterNetwork {
                                   String shopUuid,
                                   String tabUuid, String entryUuid)  implements CustomPacketPayload{
         public static final CustomPacketPayload.Type<SyncStatePacket> TYPE = new CustomPacketPayload.Type<>(
-                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(RequesterMod.MODID, "sync_state"));
+                net.minecraft.resources.Identifier.fromNamespaceAndPath(RequesterMod.MODID, "sync_state"));
         public static final StreamCodec<RegistryFriendlyByteBuf, SyncStatePacket> STREAM_CODEC =
                 CustomPacketPayload.codec(SyncStatePacket::encode, SyncStatePacket::decode);
 
@@ -228,7 +228,7 @@ public final class RequesterNetwork {
 
     public record SyncShopsPacket(List<ShopInfo> shops, List<TargetInfo> targets)  implements CustomPacketPayload{
         public static final CustomPacketPayload.Type<SyncShopsPacket> TYPE = new CustomPacketPayload.Type<>(
-                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(RequesterMod.MODID, "sync_shops"));
+                net.minecraft.resources.Identifier.fromNamespaceAndPath(RequesterMod.MODID, "sync_shops"));
         public static final StreamCodec<RegistryFriendlyByteBuf, SyncShopsPacket> STREAM_CODEC =
                 CustomPacketPayload.codec(SyncShopsPacket::encode, SyncShopsPacket::decode);
 
@@ -342,7 +342,7 @@ public final class RequesterNetwork {
                                     boolean chat, boolean enabled, String shopUuid,
                                     String tabUuid, String entryUuid)  implements CustomPacketPayload{
         public static final CustomPacketPayload.Type<SetSettingsPacket> TYPE = new CustomPacketPayload.Type<>(
-                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(RequesterMod.MODID, "set_settings"));
+                net.minecraft.resources.Identifier.fromNamespaceAndPath(RequesterMod.MODID, "set_settings"));
         public static final StreamCodec<RegistryFriendlyByteBuf, SetSettingsPacket> STREAM_CODEC =
                 CustomPacketPayload.codec(SetSettingsPacket::encode, SetSettingsPacket::decode);
 
@@ -358,7 +358,7 @@ public final class RequesterNetwork {
         public static void handle(SetSettingsPacket p, IPayloadContext context) {
             ServerPlayer sender = (ServerPlayer) context.player();
             if (sender != null) context.enqueueWork(() -> {
-                if (sender.serverLevel().getBlockEntity(p.pos) instanceof RequesterBlockEntity box
+                if (sender.level().getBlockEntity(p.pos) instanceof RequesterBlockEntity box
                         && box.stillValid(sender) && box.canEdit(sender)) {
                     boolean targetEmpty = p.shopUuid.isBlank() && p.tabUuid.isBlank() && p.entryUuid.isBlank();
                     if (!targetEmpty && !selectable(sender, p.shopUuid, p.tabUuid, p.entryUuid)) {
@@ -385,7 +385,7 @@ public final class RequesterNetwork {
 
     public record ClaimOwnerPacket(BlockPos pos)  implements CustomPacketPayload{
         public static final CustomPacketPayload.Type<ClaimOwnerPacket> TYPE = new CustomPacketPayload.Type<>(
-                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(RequesterMod.MODID, "claim_owner"));
+                net.minecraft.resources.Identifier.fromNamespaceAndPath(RequesterMod.MODID, "claim_owner"));
         public static final StreamCodec<RegistryFriendlyByteBuf, ClaimOwnerPacket> STREAM_CODEC =
                 CustomPacketPayload.codec(ClaimOwnerPacket::encode, ClaimOwnerPacket::decode);
 
@@ -401,7 +401,7 @@ public final class RequesterNetwork {
                         ServerPlayer sender = (ServerPlayer) context.player();
             if (sender != null) {
                 context.enqueueWork(() -> {
-                    if (!(sender.serverLevel().getBlockEntity(packet.pos) instanceof RequesterBlockEntity box)
+                    if (!(sender.level().getBlockEntity(packet.pos) instanceof RequesterBlockEntity box)
                             || !box.stillValid(sender)) return;
                     box.setOwner(sender.getUUID(), sender.getGameProfile().getName());
                     broadcastState(sender.server, box);
@@ -426,7 +426,7 @@ public final class RequesterNetwork {
 
     public record OpenShopSelectionPacket(BlockPos pos, String shopUuid)  implements CustomPacketPayload{
         public static final CustomPacketPayload.Type<OpenShopSelectionPacket> TYPE = new CustomPacketPayload.Type<>(
-                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(RequesterMod.MODID, "open_shop_selection"));
+                net.minecraft.resources.Identifier.fromNamespaceAndPath(RequesterMod.MODID, "open_shop_selection"));
         public static final StreamCodec<RegistryFriendlyByteBuf, OpenShopSelectionPacket> STREAM_CODEC =
                 CustomPacketPayload.codec(OpenShopSelectionPacket::encode, OpenShopSelectionPacket::decode);
 
@@ -442,7 +442,7 @@ public final class RequesterNetwork {
         public static void handle(OpenShopSelectionPacket p, IPayloadContext context) {
                         ServerPlayer sender = (ServerPlayer) context.player();
             if (sender != null) context.enqueueWork(() -> {
-                if (!(sender.serverLevel().getBlockEntity(p.pos) instanceof RequesterBlockEntity box)
+                if (!(sender.level().getBlockEntity(p.pos) instanceof RequesterBlockEntity box)
                         || !box.stillValid(sender) || !box.canEdit(sender)) {
                     sender.sendSystemMessage(net.minecraft.network.chat.Component.translatable(
                             "qshop_requester.message.not_owner"));

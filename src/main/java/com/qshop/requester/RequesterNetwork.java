@@ -59,7 +59,7 @@ public final class RequesterNetwork {
     }
 
     public static void sendClaimOwner(BlockPos pos) {
-        PacketDistributor.sendToServer(new ClaimOwnerPacket(pos));
+        net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(new ClaimOwnerPacket(pos));
     }
 
     public static void broadcastState(MinecraftServer server, RequesterBlockEntity box) {
@@ -106,12 +106,12 @@ public final class RequesterNetwork {
     public static void sendSettings(BlockPos pos, int intervalTicks, boolean actionBar,
                                     boolean chat, boolean enabled, String shopUuid,
                                     String tabUuid, String entryUuid) {
-        PacketDistributor.sendToServer(new SetSettingsPacket(pos, intervalTicks, actionBar, chat,
+        net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(new SetSettingsPacket(pos, intervalTicks, actionBar, chat,
                 enabled, shopUuid, tabUuid, entryUuid));
     }
 
     public static void openShopForSelection(BlockPos pos, String shopUuid) {
-        PacketDistributor.sendToServer(new OpenShopSelectionPacket(pos, shopUuid));
+        net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(new OpenShopSelectionPacket(pos, shopUuid));
     }
 
     private static List<ItemStack> copy(List<ItemStack> stacks) {
@@ -403,8 +403,8 @@ public final class RequesterNetwork {
                 context.enqueueWork(() -> {
                     if (!(sender.level().getBlockEntity(packet.pos) instanceof RequesterBlockEntity box)
                             || !box.stillValid(sender)) return;
-                    box.setOwner(sender.getUUID(), sender.getGameProfile().getName());
-                    broadcastState(sender.server, box);
+                    box.setOwner(sender.getUUID(), sender.getPlainTextName());
+                    broadcastState(sender.level().getServer(), box);
                 });
             }
         }

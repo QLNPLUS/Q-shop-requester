@@ -4,6 +4,19 @@ Release notes are grouped by Minecraft loader when a release supports both Forge
 
 ## [1.4.0] - 2026-09-01
 
+### NeoForge 26.1.2
+
+#### Added
+
+- Added Minecraft 26.1.2 support. This release is the first build for NeoForge 26.1.2, so it is a separate download from the NeoForge 1.21.1 and Forge 1.20.1 files.
+- Requires NeoForge 26.1.2.107 or newer, Minecraft 26.1.2, and the matching QShop 26.1.2 release.
+
+#### Notes
+
+- Requester blocks placed before this update keep their stored purchases, supplies, configured interval, notification options, and selected shop entry.
+- Only the recorded owner of an existing requester block may need to be claimed again after updating; the Claim button restores it.
+- Installing this file on Minecraft 1.21.1 or 1.20.1 will not work. Use the NeoForge 1.21.1 or Forge 1.20.1 download instead.
+
 ### NeoForge 1.21.1
 
 ### Added

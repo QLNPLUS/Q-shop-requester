@@ -42,9 +42,12 @@ public final class RequesterMod {
                     .sound(SoundType.WOOD)));
     public static final DeferredHolder<Item, Item> REQUESTER_ITEM = ITEMS.register("requester",
             () -> new BlockItem(REQUESTER.get(), new Item.Properties()));
+    // 26.1.2:BlockEntityType.Builder 已移除。直接用构造器;
+    // 原 Builder.of(factory, blocks).build(null) 的等价形式是 (supplier, Block...) 重载
+    // —— Type(datafixer)参数已从构造器签名中移除。
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RequesterBlockEntity>> REQUESTER_ENTITY =
-            BLOCK_ENTITIES.register("requester", () -> BlockEntityType.Builder.of(
-                    RequesterBlockEntity::new, REQUESTER.get()).build(null));
+            BLOCK_ENTITIES.register("requester", () -> new BlockEntityType<>(
+                    RequesterBlockEntity::new, REQUESTER.get()));
     public static final DeferredHolder<MenuType<?>, MenuType<RequesterMenu>> REQUESTER_MENU = MENUS.register(
             "requester", () -> {
                 IContainerFactory<RequesterMenu> factory = RequesterMenu::new;
@@ -67,7 +70,7 @@ public final class RequesterMod {
                 "qshop_requester-common.toml");
         RequesterNetwork.init(bus);
         bus.addListener(RequesterMod::registerCapabilities);
-        if (FMLEnvironment.dist == Dist.CLIENT) {
+        if (FMLEnvironment.getDist() == Dist.CLIENT) {
             bus.addListener(RequesterClient::registerMenuScreens);
         }
     }

@@ -62,17 +62,20 @@ public final class RequesterTextures {
         g.blit(RenderPipelines.GUI_TEXTURED, t, x, y + h - border, 0, th - border, border, border, tw, th);
         g.blit(RenderPipelines.GUI_TEXTURED, t, x + w - border, y + h - border, tw - border, th - border,
                 border, border, tw, th);
+        // 26.1.2 的 10 参 blit 顺序是 (x, y, u, v, width, height, srcW, srcH, texW, texH),
+        // 而 1.21.1 的 10 参重载是 (x, y, width, height, u, v, srcW, srcH, texW, texH)。
+        // 两者只是把 u,v 与 width,height 前后调换 —— 写错仍能编译,但九宫格中段会塌成 0 高度。
         if (mw > 0) {
-            g.blit(RenderPipelines.GUI_TEXTURED, t, x + border, y, mw, border, border, 0, iw, border, tw, th);
-            g.blit(RenderPipelines.GUI_TEXTURED, t, x + border, y + h - border, mw, border, border, th - border, iw, border, tw, th);
+            g.blit(RenderPipelines.GUI_TEXTURED, t, x + border, y, border, 0, mw, border, iw, border, tw, th);
+            g.blit(RenderPipelines.GUI_TEXTURED, t, x + border, y + h - border, border, th - border, mw, border, iw, border, tw, th);
         }
         if (mh > 0) {
-            g.blit(RenderPipelines.GUI_TEXTURED, t, x, y + border, border, mh, 0, border, border, ih, tw, th);
-            g.blit(RenderPipelines.GUI_TEXTURED, t, x + w - border, y + border, border, mh, tw - border, border, border, ih, tw, th);
+            g.blit(RenderPipelines.GUI_TEXTURED, t, x, y + border, 0, border, border, mh, border, ih, tw, th);
+            g.blit(RenderPipelines.GUI_TEXTURED, t, x + w - border, y + border, tw - border, border, border, mh, border, ih, tw, th);
         }
         if (mw > 0 && mh > 0) {
-            g.blit(RenderPipelines.GUI_TEXTURED, t, x + border, y + border, mw, mh,
-                    border, border, iw, ih, tw, th);
+            g.blit(RenderPipelines.GUI_TEXTURED, t, x + border, y + border, border, border, mw, mh,
+                    iw, ih, tw, th);
         }
     }
 }

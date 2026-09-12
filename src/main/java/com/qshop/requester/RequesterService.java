@@ -295,11 +295,17 @@ public final class RequesterService {
                         .replace("%currency%", entry.currencyId == null ? "" : entry.currencyId)
                         .replace("%multiplier%", String.valueOf(commandUnits));
                 try {
+                    // 26.1.2:权限由 int 等级改为 PermissionSet。旧写法 command.op ? 4 : 0
+                    // 意为"op 时等级 4(OWNER),否则 0(ALL)",对应新的
+                    // LevelBasedPermissionSet.OWNER / .ALL。
+                    net.minecraft.server.permissions.PermissionSet perms = command.op
+                            ? net.minecraft.server.permissions.LevelBasedPermissionSet.OWNER
+                            : net.minecraft.server.permissions.LevelBasedPermissionSet.ALL;
                     CommandSourceStack source = onlineOwner == null
-                            ? server.createCommandSourceStack().withPermission(command.op ? 4 : 0)
+                            ? server.createCommandSourceStack().withPermission(perms)
                             : new CommandSourceStack(onlineOwner, onlineOwner.position(),
                             onlineOwner.getRotationVector(), onlineOwner.level(),
-                            command.op ? 4 : 0, playerName, onlineOwner.getDisplayName(), server, onlineOwner);
+                            perms, playerName, onlineOwner.getDisplayName(), server, onlineOwner);
                     if (command.silent) source = source.withSuppressedOutput();
                     server.getCommands().performPrefixedCommand(source, text);
                 } catch (RuntimeException ignored) {
@@ -472,14 +478,14 @@ public final class RequesterService {
             Path temp = target.resolveSibling(target.getFileName() + ".qshop-requester.tmp");
             try {
                 CompoundTag playerData = NbtIo.readCompressed(target, NbtAccounter.unlimitedHeap());
-                CompoundTag attachments = playerData.getCompound(NEOFORGE_ATTACHMENTS_KEY);
-                CompoundTag forgeCaps = playerData.getCompound(FORGE_CAPS_KEY);
+                CompoundTag attachments = playerData.getCompoundOrEmpty(NEOFORGE_ATTACHMENTS_KEY);
+                CompoundTag forgeCaps = playerData.getCompoundOrEmpty(FORGE_CAPS_KEY);
                 CompoundTag wallet = attachments.contains(WALLET_CAPABILITY_KEY)
-                        ? attachments.getCompound(WALLET_CAPABILITY_KEY)
-                        : forgeCaps.getCompound(WALLET_CAPABILITY_KEY);
-                CompoundTag limits = wallet.getCompound("limits");
-                CompoundTag value = limits.getCompound(key);
-                int count = period.equals(value.getString("period")) ? value.getInt("count") : 0;
+                        ? attachments.getCompoundOrEmpty(WALLET_CAPABILITY_KEY)
+                        : forgeCaps.getCompoundOrEmpty(WALLET_CAPABILITY_KEY);
+                CompoundTag limits = wallet.getCompoundOrEmpty("limits");
+                CompoundTag value = limits.getCompoundOrEmpty(key);
+                int count = period.equals(value.getString("period").orElse("")) ? value.getInt("count").orElse(0) : 0;
                 value.putString("period", period);
                 value.putInt("count", count + amount);
                 limits.put(key, value);
@@ -524,7 +530,7 @@ public final class RequesterService {
     }
 
     private static void notifySuccess(RequesterBlockEntity box, ServerPlayer owner, int totalItems) {
-        if (box.showActionBarNotification()) owner.displayClientMessage(Component.translatable(
+        if (box.showActionBarNotification()) owner.sendSystemMessage(Component.translatable(
                 "qshop_requester.message.trade_success", totalItems), true);
         if (box.showChatNotification()) owner.sendSystemMessage(Component.translatable(
                 "qshop_requester.message.trade_success", totalItems));
@@ -532,7 +538,7 @@ public final class RequesterService {
 
     private static void notifyFailure(RequesterBlockEntity box, ServerPlayer owner, Component reason) {
         Component message = Component.translatable("qshop_requester.message.trade_failed", reason);
-        if (box.showActionBarNotification()) owner.displayClientMessage(message, true);
+        if (box.showActionBarNotification()) owner.sendSystemMessage(message, true);
         if (box.showChatNotification()) owner.sendSystemMessage(message);
     }
 }

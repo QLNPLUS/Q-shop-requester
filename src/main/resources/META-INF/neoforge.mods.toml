@@ -13,14 +13,14 @@ description='''A QShop addon that automatically buys selected shop entries.'''
 [[dependencies.${mod_id}]]
 modId="neoforge"
 type="required"
-versionRange="[21.1.248,)"
+versionRange="[26.1.2.107,)"
 ordering="NONE"
 side="BOTH"
 
 [[dependencies.${mod_id}]]
 modId="minecraft"
 type="required"
-versionRange="[1.21.1]"
+versionRange="[26.1.2]"
 ordering="NONE"
 side="BOTH"
 

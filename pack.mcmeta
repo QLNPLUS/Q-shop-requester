@@ -1,6 +1,7 @@
 {
   "pack": {
-    "pack_format": 15,
-    "description": "QShop Requester resources"
+    "description": "QShop Requester resources",
+    "min_format": [84, 0],
+    "max_format": [101, 1]
   }
 }

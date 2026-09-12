@@ -18,9 +18,8 @@ import java.util.List;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
-import net.neoforged.api.distmarker.OnlyIn;
-
-@OnlyIn(Dist.CLIENT)
+// 26.1.2 移除了 @OnlyIn 的成员裁剪行为,保留它只会让加载期多一条 loadwarning.neoforge.onlyin。
+// 客户端的限定已经由下面的 @EventBusSubscriber(value = Dist.CLIENT) 完整表达。
 @EventBusSubscriber(modid = RequesterMod.MODID, value = Dist.CLIENT)
 public final class RequesterClient {
     private static final Field SHOP_DATA = field(ShopScreen.class, "data");

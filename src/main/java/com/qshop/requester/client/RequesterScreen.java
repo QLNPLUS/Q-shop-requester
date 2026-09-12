@@ -1,6 +1,5 @@
 package com.qshop.requester.client;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.qshop.requester.RequesterMenu;
 import com.qshop.requester.RequesterMod;
 import com.qshop.requester.RequesterNetwork;
@@ -10,12 +9,15 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -60,10 +62,15 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             super(font, x, y, width, height, message);
         }
         private void renderManual(GuiGraphicsExtractor g, int mx, int my, float partial) {
-            manualRender = true; render(g, mx, my, partial); manualRender = false;
+            manualRender = true;
+            extractRenderState(g, mx, my, partial);
+            manualRender = false;
         }
-        @Override public void renderWidget(GuiGraphicsExtractor g, int mx, int my, float partial) {
-            if (manualRender) super.renderWidget(g, mx, my, partial);
+        // 26.1.2:AbstractWidget 的虚方法是 extractWidgetRenderState;
+        // extractRenderState 变为 final 的外层入口,不能再被覆写。
+        // EditBox 把该方法的可见性放宽为 public,覆写时不能收窄。
+        @Override public void extractWidgetRenderState(GuiGraphicsExtractor g, int mx, int my, float partial) {
+            if (manualRender) super.extractWidgetRenderState(g, mx, my, partial);
         }
     }
 
@@ -121,7 +128,14 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         dropdown = tab == 1 && searchInput != null && !filteredShops().isEmpty();
     }
 
-    @Override protected void renderBg(GuiGraphicsExtractor g, float partial, int mx, int my) {
+    // 26.1.2:AbstractContainerScreen 不再有 renderBg/renderBackground 这对虚方法。
+    // 背景改由 Screen.extractBackground(在 extractRenderState 之前、更低的 stratum 调用)负责,
+    // 因此把原来的"暗色蒙版 + 未选中页签 + 页面底图"合并到这里。
+    // 蒙版只在物品页出现:设置页会用不透明的 ownerBackground 整块覆盖。
+    @Override public void extractBackground(GuiGraphicsExtractor g, int mx, int my, float partial) {
+        if (tab == 0) {
+            g.fill(0, 0, this.width, this.height, 0x66000000);
+        }
         // Match Q-shop sellbox: unselected tabs sit behind the page background.
         for (int page = 0; page < 2; page++) {
             if (page != tab) {
@@ -133,32 +147,31 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         RequesterTextures.background(g, leftPos, topPos);
     }
 
-    @Override public void renderBackground(GuiGraphicsExtractor g, int mx, int my, float partial) {
-        g.fill(0, 0, this.width, this.height, 0x66000000);
-        renderBg(g, partial, mx, my);
-    }
-
-    @Override protected void renderLabels(GuiGraphicsExtractor g, int mx, int my) {
+    // 26.1.2:renderLabels 改名为 extractLabels,且同样在平移过 (leftPos, topPos) 的
+    // 局部坐标系里调用,所以这里的 layoutX/layoutY 不需要再加 leftPos/topPos。
+    @Override protected void extractLabels(GuiGraphicsExtractor g, int mx, int my) {
         if (tab != 0) return;
-        g.drawString(font, Component.translatable("qshop_requester.purchase"),
+        g.text(font, Component.translatable("qshop_requester.purchase"),
                 layoutX(RequesterLayoutDebug.Widget.ITEM_PURCHASE_TITLE, 8),
                 layoutY(RequesterLayoutDebug.Widget.ITEM_PURCHASE_TITLE, 6), DARK, false);
-        g.drawString(font, Component.translatable("qshop_requester.supply"),
+        g.text(font, Component.translatable("qshop_requester.supply"),
                 layoutX(RequesterLayoutDebug.Widget.ITEM_SUPPLY_TITLE, 98),
                 layoutY(RequesterLayoutDebug.Widget.ITEM_SUPPLY_TITLE, 6), DARK, false);
-        g.drawString(font, Component.translatable("container.inventory"),
+        g.text(font, Component.translatable("container.inventory"),
                 layoutX(RequesterLayoutDebug.Widget.ITEM_INVENTORY, 8),
                 layoutY(RequesterLayoutDebug.Widget.ITEM_INVENTORY, inventoryLabelY - 1), DARK, false);
     }
 
-    @Override public void render(GuiGraphicsExtractor g, int mx, int my, float partial) {
+    // 26.1.2:render 改名为 extractRenderState。它只负责"内容",背景由 extractBackground
+    // 在更低的 stratum 先画好;叠放次序改用 nextStratum() 表达。
+    // 旧代码里的 g.flush()/flushAll() 已无对应 API:26.1.2 的 GUI 提交改为 stratum 模型,
+    // 不再由调用方手动冲刷缓冲。
+    @Override public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float partial) {
         syncInputPosition();
         if (tab == 0) {
-            super.render(g, mx, my, partial);
-            flushAll(g);
+            super.extractRenderState(g, mx, my, partial);
         } else {
-            renderBg(g, partial, mx, my);
-            g.flush();
+            extractBackground(g, mx, my, partial);
         }
 
         g.pose().pushMatrix();
@@ -167,7 +180,6 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             // Put the opaque settings page over the base container page, then
             // draw the selected tab on top of it like Q-shop sellbox.
             RequesterTextures.ownerBackground(g, leftPos, topPos);
-            flushAll(g);
             renderSettings(g, mx, my);
         }
         renderSelectedTab(g);
@@ -177,30 +189,22 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             g.pose().pushMatrix();
             g.nextStratum();
             searchInput.renderManual(g, mx, my, partial);
-            g.flush();
             g.pose().popMatrix();
         }
         if (tab == 1 && intervalInput != null) {
             g.pose().pushMatrix();
             g.nextStratum();
             intervalInput.renderManual(g, mx, my, partial);
-            g.flush();
             g.pose().popMatrix();
         }
         if (dropdown) {
             g.pose().pushMatrix();
             g.nextStratum();
             renderDropdown(g, mx, my);
-            flushAll(g);
             g.pose().popMatrix();
         }
-        if (tab == 0) {
-            g.pose().pushMatrix();
-            g.nextStratum();
-            super.renderTooltip(g, mx, my);
-            g.flush();
-            g.pose().popMatrix();
-        }
+        // 物品页的 tooltip 由 super.extractRenderState -> extractTooltip 递交,
+        // 设置页由下面的覆写拦掉,所以这里不再重复调用。
         renderDebugOverlay(g);
     }
 
@@ -215,7 +219,6 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 screenX(RequesterLayoutDebug.Widget.TAB_SETTINGS, 32),
                 screenY(RequesterLayoutDebug.Widget.TAB_SETTINGS, -20));
         g.pose().popMatrix();
-        flushAll(g);
     }
 
     private int tabX(int page) {
@@ -313,16 +316,19 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     }
 
     private void drawAvatar(GuiGraphicsExtractor g, int x, int y, UUID owner) {
-        ResourceLocation skin = ResourceLocation.fromNamespaceAndPath(
+        Identifier skin = Identifier.fromNamespaceAndPath(
                 "minecraft", "textures/entity/steve.png");
         if (owner != null && Minecraft.getInstance().getConnection() != null) {
             PlayerInfo info = Minecraft.getInstance().getConnection().getPlayerInfo(owner);
-            if (info != null) skin = info.getSkin().texture();
+            // 26.1.2:PlayerSkin.texture() 已拆分为 body()/cape()/elytra(),
+            // 各自返回 ClientAsset.Texture,取 Identifier 用 texturePath()。
+            if (info != null) skin = info.getSkin().body().texturePath();
         }
-        RenderSystem.setShader(GameRenderer::getPositionTexShader);
-        RenderSystem.setShaderTexture(0, skin);
-        g.blit(skin, x, y, 20, 20, 8, 8, 8, 8, 64, 64);
-        g.blit(skin, x, y, 20, 20, 40, 8, 8, 8, 64, 64);
+        // 26.1.2:RenderSystem.setShader/setShaderTexture 已移除,管线由 blit 首参指定。
+        // 注意 26.1.2 的 10 参重载顺序是 (x, y, u, v, width, height, srcW, srcH, texW, texH),
+        // 与 1.21.1 的 (x, y, width, height, u, v, srcW, srcH, texW, texH) 不同,不能只加首参。
+        g.blit(RenderPipelines.GUI_TEXTURED, skin, x, y, 8, 8, 20, 20, 8, 8, 64, 64);
+        g.blit(RenderPipelines.GUI_TEXTURED, skin, x, y, 40, 8, 20, 20, 8, 8, 64, 64);
     }
 
     private void renderDropdown(GuiGraphicsExtractor g, int mx, int my) {
@@ -382,20 +388,18 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     private void drawScrollingText(GuiGraphicsExtractor g, String text, int x, int y, int width) {
         int textWidth = font.width(text);
         if (textWidth <= width) {
-            g.drawString(font, Component.literal(text), x, y, WHITE, true);
+            g.text(font, Component.literal(text), x, y, WHITE, true);
             return;
         }
         long cycle = Math.max(2600L, (long) (textWidth - width) * 75L + 1800L);
         long phase = Util.getMillis() % cycle;
         int offset = phase < 700L ? 0 : (int) Math.min(textWidth - width, phase - 700L);
-        g.flush();
         g.enableScissor(x, y - 1, x + width, y + font.lineHeight + 1);
-        g.drawString(font, Component.literal(text), x - offset, y, WHITE, true);
+        g.text(font, Component.literal(text), x - offset, y, WHITE, true);
         if (offset > 0) {
-            g.drawString(font, Component.literal(text), x - offset + textWidth + 18,
+            g.text(font, Component.literal(text), x - offset + textWidth + 18,
                     y, WHITE, true);
         }
-        g.flush();
         g.disableScissor();
     }
 
@@ -515,7 +519,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     // 26.1.2:输入事件改为记录类型(MouseButtonEvent/KeyEvent/CharacterEvent),
     // 不再逐个传 (x, y, button) 或 (keyCode, scanCode, modifiers)。
-    @Override public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubled) {
+    @Override public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {
         double mx = event.x();
         double my = event.y();
         int button = event.button();
@@ -541,7 +545,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 return true;
             }
             if (dropdown) {
-                if (handleSearchClick(mx, my, button)) return true;
+                if (handleSearchClick(event, doubled)) return true;
                 int x = screenX(RequesterLayoutDebug.Widget.TARGET_BUTTON, 8);
                 int y = screenY(RequesterLayoutDebug.Widget.TARGET_BUTTON, 46);
                 int start = targetPage * 4;
@@ -575,7 +579,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 menu.setSettings(menu.intervalTicks(), menu.actionBar(), !menu.chat(), menu.enabled(),
                         menu.shopUuid(), menu.tabUuid(), menu.entryUuid()); sendSettings(); return true;
             }
-            if (handleSearchClick(mx, my, button)) return true;
+            if (handleSearchClick(event, doubled)) return true;
             if (intervalInput != null && intervalInput.mouseClicked(event, doubled)) {
                 if (searchInput != null) searchInput.setFocused(false);
                 intervalInput.setFocused(true); return true;
@@ -585,10 +589,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         return super.mouseClicked(event, doubled);
     }
 
-    @Override public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+    @Override public boolean keyPressed(KeyEvent event) {
         int keyCode = event.key();
-        int scanCode = event.scancode();
-        int modifiers = event.modifiers();
         if (keyCode == GLFW.GLFW_KEY_F8) {
             if (!RequesterLayoutDebug.isConfiguredEnabled()) {
                 return super.keyPressed(event);
@@ -599,7 +601,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         }
         if (RequesterLayoutDebug.isEnabled()) {
             if (keyCode == GLFW.GLFW_KEY_TAB) {
-                RequesterLayoutDebug.selectNext(tab, hasShiftDown());
+                RequesterLayoutDebug.selectNext(tab, event.hasShiftDown());
                 return true;
             }
             int dx = 0, dy = 0;
@@ -608,7 +610,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             if (keyCode == GLFW.GLFW_KEY_UP) dy = -1;
             if (keyCode == GLFW.GLFW_KEY_DOWN) dy = 1;
             if (dx != 0 || dy != 0) {
-                int step = hasAltDown() ? 1 : 5;
+                int step = event.hasAltDown() ? 1 : 5;
                 RequesterLayoutDebug.moveSelected(tab, dx * step, dy * step);
                 syncInputPosition();
                 return true;
@@ -629,7 +631,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         return super.keyPressed(event);
     }
 
-    @Override public boolean charTyped(char codePoint, int modifiers) {
+    @Override public boolean charTyped(CharacterEvent charEvent) {
         if (tab == 1 && searchInput != null && searchInput.isFocused()
                 && searchInput.charTyped(charEvent)) {
             refreshSearchDropdown();
@@ -657,11 +659,12 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         super.mouseMoved(mx, my);
     }
 
-    @Override protected void renderTooltip(GuiGraphicsExtractor g, int mx, int my) {
+    // 26.1.2:renderTooltip 改名为 extractTooltip(仍在 AbstractContainerScreen 上,protected)。
+    @Override protected void extractTooltip(GuiGraphicsExtractor g, int mx, int my) {
         // Do not allow EMI or vanilla tooltip callbacks to leak into the
         // settings page after its item panel has been hidden.
         if (tab == 1) return;
-        super.renderTooltip(g, mx, my);
+        super.extractTooltip(g, mx, my);
     }
 
     @Override public void removed() {
@@ -671,13 +674,15 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     }
 
     private void drawText(GuiGraphicsExtractor g, Component text, int x, int y, int color) {
-        g.drawString(font, text, leftPos + x, topPos + y, color, true);
+        g.text(font, text, leftPos + x, topPos + y, color, true);
     }
     private void drawText(GuiGraphicsExtractor g, String text, int x, int y, int color) {
         drawText(g, Component.literal(text), x, y, color);
     }
 
-    private boolean handleSearchClick(double mx, double my, int button) {
+    private boolean handleSearchClick(MouseButtonEvent event, boolean doubled) {
+        double mx = event.x();
+        double my = event.y();
         int searchX = screenX(RequesterLayoutDebug.Widget.SEARCH_INPUT, 8);
         int searchY = screenY(RequesterLayoutDebug.Widget.SEARCH_INPUT, 30);
         if (searchInput != null && inside(mx, my, searchX, searchY, 160, 14)
@@ -692,15 +697,12 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     private void drawCentered(GuiGraphicsExtractor g, String text, int x, int y, int color, int maxWidth) {
         String value = font.plainSubstrByWidth(text, Math.max(1, maxWidth));
-        g.drawString(font, value, leftPos + x - font.width(value) / 2, topPos + y, color, true);
+        g.text(font, value, leftPos + x - font.width(value) / 2, topPos + y, color, true);
     }
     private int buttonWidth(Component label, int min, int max) { return Mth.clamp(font.width(label) + 12, min, max); }
     private String trim(String value, int max) { return value.length() <= max ? value : value.substring(0, Math.max(0, max - 3)) + "..."; }
     private static boolean inside(double mx, double my, int x, int y, int w, int h) {
         return mx >= x && mx < x + w && my >= y && my < y + h;
-    }
-    private static void flushAll(GuiGraphicsExtractor g) {
-        g.flush(); Minecraft.getInstance().renderBuffers().bufferSource().endBatch();
     }
 
     private void renderDebugOverlay(GuiGraphicsExtractor g) {
@@ -768,7 +770,6 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         g.pose().pushMatrix();
         g.nextStratum();
         RequesterLayoutDebug.renderOverlay(g, font, x, y, width, height);
-        flushAll(g);
         g.pose().popMatrix();
     }
 

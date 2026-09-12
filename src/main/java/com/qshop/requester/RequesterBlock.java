@@ -39,9 +39,9 @@ public final class RequesterBlock extends BaseEntityBlock {
     @Override public void setPlacedBy(Level level, BlockPos pos, BlockState state,
                                       @Nullable LivingEntity placer, ItemStack stack) {
         super.setPlacedBy(level, pos, state, placer, stack);
-        if (!level.isClientSide && placer instanceof Player player
+        if (!level.isClientSide() && placer instanceof Player player
                 && level.getBlockEntity(pos) instanceof RequesterBlockEntity box) {
-            box.setOwner(player.getUUID(), player.getGameProfile().getName());
+            box.setOwner(player.getUUID(), player.getPlainTextName());
         }
     }
 
@@ -66,16 +66,17 @@ public final class RequesterBlock extends BaseEntityBlock {
         return InteractionResult.CONSUME;
     }
 
-    @Override protected net.minecraft.world.ItemInteractionResult useItemOn(
+    // 26.1.2:useItemOn 新增首个 ItemStack 参数,返回类型由 ItemInteractionResult 改为 InteractionResult
+    @Override protected InteractionResult useItemOn(
             ItemStack stack, BlockState state, Level level, BlockPos pos, Player player,
             InteractionHand hand, BlockHitResult hit) {
         useWithoutItem(state, level, pos, player, hit);
-        return net.minecraft.world.ItemInteractionResult.sidedSuccess(level.isClientSide);
+        return InteractionResult.sidedSuccess(level.isClientSide());
     }
 
     @Override public <T extends BlockEntity> BlockEntityTicker<T> getTicker(
             Level level, BlockState state, BlockEntityType<T> type) {
-        return level.isClientSide ? null : createTickerHelper(type,
+        return level.isClientSide() ? null : createTickerHelper(type,
                 RequesterMod.REQUESTER_ENTITY.get(), RequesterBlockEntity::serverTick);
     }
 

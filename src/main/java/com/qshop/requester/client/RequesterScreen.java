@@ -6,6 +6,7 @@ import com.qshop.requester.RequesterMod;
 import com.qshop.requester.RequesterNetwork;
 import com.qshop.requester.RequesterClient;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
@@ -208,10 +209,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         RequesterTextures.tab(g, tabX(tab), tabY(tab), tab, true);
         g.pose().pushPose();
         g.pose().translate(0, 0, 100);
-        g.renderItem(RequesterMod.REQUESTER_ITEM.get().getDefaultInstance(),
+        g.item(RequesterMod.REQUESTER_ITEM.get().getDefaultInstance(),
                 screenX(RequesterLayoutDebug.Widget.TAB_ITEMS, 5),
                 screenY(RequesterLayoutDebug.Widget.TAB_ITEMS, -20));
-        g.renderItem(new ItemStack(Items.COMPARATOR),
+        g.item(new ItemStack(Items.COMPARATOR),
                 screenX(RequesterLayoutDebug.Widget.TAB_SETTINGS, 32),
                 screenY(RequesterLayoutDebug.Widget.TAB_SETTINGS, -20));
         g.pose().popPose();
@@ -281,7 +282,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         } else {
             int infoX = screenX(RequesterLayoutDebug.Widget.SELECTED_INFO, 8);
             int infoY = screenY(RequesterLayoutDebug.Widget.SELECTED_INFO, 63);
-            g.renderItem(selected.display, infoX, infoY);
+            g.item(selected.display, infoX, infoY);
             drawScrollingText(g, selected.label, infoX + 22, infoY + 3, 138);
             List<String> details = targetDetails(selected);
             for (int i = 0; i < details.size() && i < 3; i++) {
@@ -338,7 +339,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             int rowY = y + 18 + i * 18;
             boolean hovered = inside(mx, my, x + 2, rowY, 156, 18);
             if (hovered) RequesterTextures.entryHighlight(g, x, rowY);
-            g.renderItem(shop.icon, x + 4, rowY + 1);
+            g.item(shop.icon, x + 4, rowY + 1);
             drawScrollingText(g, shop.shopName, x + 23, rowY + 5, 131);
         }
     }
@@ -615,7 +616,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             }
         }
         if (tab == 1 && searchInput != null && searchInput.isFocused()) {
-            if (searchInput.keyPressed(keyCode, scanCode, modifiers)) {
+            if (searchInput.keyPressed(event)) {
                 refreshSearchDropdown();
                 return true;
             }
@@ -624,20 +625,20 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
                 intervalInput.setFocused(false); sendSettings(); return true;
             }
-            if (intervalInput.keyPressed(keyCode, scanCode, modifiers)) return true;
+            if (intervalInput.keyPressed(event)) return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.keyPressed(event);
     }
 
     @Override public boolean charTyped(char codePoint, int modifiers) {
         if (tab == 1 && searchInput != null && searchInput.isFocused()
-                && searchInput.charTyped(codePoint, modifiers)) {
+                && searchInput.charTyped(charEvent)) {
             refreshSearchDropdown();
             return true;
         }
         if (tab == 1 && intervalInput != null && intervalInput.isFocused()
-                && intervalInput.charTyped(codePoint, modifiers)) return true;
-        return super.charTyped(codePoint, modifiers);
+                && intervalInput.charTyped(charEvent)) return true;
+        return super.charTyped(charEvent);
     }
 
     @Override public boolean mouseScrolled(double mx, double my, double deltaX, double deltaY) {
@@ -681,7 +682,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         int searchX = screenX(RequesterLayoutDebug.Widget.SEARCH_INPUT, 8);
         int searchY = screenY(RequesterLayoutDebug.Widget.SEARCH_INPUT, 30);
         if (searchInput != null && inside(mx, my, searchX, searchY, 160, 14)
-                && searchInput.mouseClicked(mx, my, button)) {
+                && searchInput.mouseClicked(event, doubled)) {
             if (intervalInput != null) intervalInput.setFocused(false);
             searchInput.setFocused(true);
             refreshSearchDropdown();

@@ -7,7 +7,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import com.qshop.requester.RequesterConfig;
 
@@ -110,7 +110,7 @@ public final class RequesterLayoutDebug {
         save();
     }
 
-    public static void renderOverlay(GuiGraphics graphics, Font font, int x, int y, int width, int height) {
+    public static void renderOverlay(GuiGraphicsExtractor graphics, Font font, int x, int y, int width, int height) {
         int right = x + Math.max(1, width);
         int bottom = y + Math.max(1, height);
         graphics.fill(x, y, right, y + 1, 0xFFFFD54F);
@@ -121,8 +121,8 @@ public final class RequesterLayoutDebug {
         String offset = "offset " + position(selected).x() + ", " + position(selected).y();
         int textWidth = Math.max(font.width(label), font.width(offset));
         graphics.fill(2, 2, textWidth + 8, font.lineHeight * 2 + 7, 0xCC111111);
-        graphics.drawString(font, Component.literal(label), 4, 4, 0xFFFFD54F, false);
-        graphics.drawString(font, Component.literal(offset), 4, 4 + font.lineHeight,
+        graphics.text(font, Component.literal(label), 4, 4, 0xFFFFD54F, false);
+        graphics.text(font, Component.literal(offset), 4, 4 + font.lineHeight,
                 0xFFFFFFFF, false);
     }
 

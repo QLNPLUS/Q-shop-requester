@@ -129,13 +129,14 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     }
 
     // 26.1.2:AbstractContainerScreen 不再有 renderBg/renderBackground 这对虚方法。
-    // 背景改由 Screen.extractBackground(在 extractRenderState 之前、更低的 stratum 调用)负责,
-    // 因此把原来的"暗色蒙版 + 未选中页签 + 页面底图"合并到这里。
-    // 蒙版只在物品页出现:设置页会用不透明的 ownerBackground 整块覆盖。
+    // 背景改由 Screen.extractBackground 负责 —— 框架在 extractRenderState 之前、更低的
+    // stratum 里**两个分页都会调用**它,所以把原来的"暗色蒙版 + 未选中页签 + 页面底图"
+    // 整块合并到这里,并且蒙版对两个分页都要画:
+    // 1.21.1 的分支写法是 `tab == 0 ? super.render(...) : renderBg(...)`,
+    // 而蒙版只在 super.render → Screen.render → renderBackground 那条路上,
+    // 于是设置页从来没有蒙版 —— 切到设置页时面板外的世界会突然变亮。
     @Override public void extractBackground(GuiGraphicsExtractor g, int mx, int my, float partial) {
-        if (tab == 0) {
-            g.fill(0, 0, this.width, this.height, 0x66000000);
-        }
+        g.fill(0, 0, this.width, this.height, 0x66000000);
         // Match Q-shop sellbox: unselected tabs sit behind the page background.
         for (int page = 0; page < 2; page++) {
             if (page != tab) {
@@ -168,10 +169,12 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     // 不再由调用方手动冲刷缓冲。
     @Override public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float partial) {
         syncInputPosition();
+        // 背景(含蒙版)已由框架在更低的 stratum 调用 extractBackground 画好,两个分页都是,
+        // 所以这里不再重复调用,否则蒙版会被叠两次(0x66 上面再压一层 0x66)。
+        // 物品页额外需要容器本体(标签/槽位/carried item);设置页不画,由下面不透明的
+        // ownerBackground 整块顶替。
         if (tab == 0) {
             super.extractRenderState(g, mx, my, partial);
-        } else {
-            extractBackground(g, mx, my, partial);
         }
 
         g.pose().pushMatrix();

@@ -207,7 +207,7 @@ public final class RequesterService {
             return failure(TradeResult.Status.FAILED);
         }
         if (!entry.commands.isEmpty()) {
-            executeCommands(server, onlineOwner, owner, shop, entryIndex, entry, units);
+            executeCommands(server, onlineOwner, owner, box.ownerName(), shop, entryIndex, entry, units);
         }
         if (onlineOwner != null) {
             QShopTradeEvents.postAfter(onlineOwner, shop, tabIndex, entryIndex, entry, units,
@@ -270,9 +270,9 @@ public final class RequesterService {
     }
 
     private static void executeCommands(MinecraftServer server, ServerPlayer onlineOwner, UUID owner,
-                                        Shop shop, int entryIndex, ShopEntry entry, int units) {
+                                        String ownerName, Shop shop, int entryIndex, ShopEntry entry, int units) {
         String playerName = onlineOwner == null
-                ? owner.toString()
+                ? (ownerName == null || ownerName.isBlank() ? owner.toString() : ownerName)
                 : onlineOwner.getPlainTextName();
         int commandRuns = entry.type == ShopEntryType.COMMAND ? units : 1;
         int commandUnits = entry.type == ShopEntryType.COMMAND ? 1 : units;

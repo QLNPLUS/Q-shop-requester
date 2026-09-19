@@ -11,7 +11,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
@@ -82,28 +81,4 @@ public final class RequesterBlock extends BaseEntityBlock {
                 RequesterMod.REQUESTER_ENTITY.get(), RequesterBlockEntity::serverTick);
     }
 
-    // 26.1.2:onRemove(BlockState, Level, BlockPos, BlockState, boolean) 已被
-    // affectNeighborsAfterRemoval(BlockState, ServerLevel, BlockPos, boolean) 取代。
-    // 参数由 Level 收窄为 ServerLevel,boolean 语义由 moved 变为 isMoving。
-    @Override protected void affectNeighborsAfterRemoval(BlockState state, net.minecraft.server.level.ServerLevel level,
-                                                         BlockPos pos, boolean isMoving) {
-        if (!state.is(level.getBlockState(pos).getBlock())
-                && level.getBlockEntity(pos) instanceof RequesterBlockEntity box) {
-            for (int slot = 0; slot < box.purchased().getSlots(); slot++) {
-                drop(level, pos, box.purchased().extractItem(slot,
-                        box.purchased().getStackInSlot(slot).getCount(), false));
-            }
-            for (int slot = 0; slot < box.supplied().getSlots(); slot++) {
-                drop(level, pos, box.supplied().extractItem(slot,
-                        box.supplied().getStackInSlot(slot).getCount(), false));
-            }
-            level.removeBlockEntity(pos);
-        }
-        super.affectNeighborsAfterRemoval(state, level, pos, isMoving);
-    }
-
-    private static void drop(Level level, BlockPos pos, ItemStack stack) {
-        if (!stack.isEmpty()) net.minecraft.world.Containers.dropItemStack(level,
-                pos.getX(), pos.getY(), pos.getZ(), stack);
-    }
 }

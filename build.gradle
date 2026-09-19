@@ -34,7 +34,22 @@ repositories {
 }
 
 dependencies {
-    compileOnly files('../Q-shop-neoforge-1.21.1/build/libs/qshop-neoforge-26.1.2-1.6.2.jar')
+    def qshopJar = findProperty('qshopJar') != null
+            ? file(findProperty('qshopJar').toString())
+            : fileTree('../Q-shop-neoforge-1.26.1.2/build/libs') {
+                include 'qshop-neoforge-26.1.2-*.jar'
+            }.files
+            .with { jars ->
+                if (jars.size() != 1) {
+                    throw new GradleException(
+                            "Expected exactly one QShop 26.1.2 jar in ../Q-shop-neoforge-1.26.1.2/build/libs, found: $jars")
+                }
+                jars.iterator().next()
+            }
+    if (!qshopJar.isFile()) {
+        throw new GradleException("QShop dependency jar does not exist: $qshopJar")
+    }
+    compileOnly files(qshopJar)
 }
 
 tasks.withType(JavaCompile).configureEach {

@@ -5,6 +5,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.Containers;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -29,6 +30,8 @@ public final class RequesterBlockEntity extends BlockEntity {
     private final ItemStackHandler supplied = new ItemStackHandler(12) {
         @Override protected void onContentsChanged(int slot) { setChanged(); }
     };
+    private final RequesterItemHandler purchasedTransfer = new RequesterItemHandler(purchased, false, true);
+    private final RequesterItemHandler suppliedTransfer = new RequesterItemHandler(supplied, true, false);
 
     @Nullable private UUID owner;
     private String ownerName = "";
@@ -65,6 +68,8 @@ public final class RequesterBlockEntity extends BlockEntity {
 
     public ItemStackHandler purchased() { return purchased; }
     public ItemStackHandler supplied() { return supplied; }
+    public RequesterItemHandler purchasedTransfer() { return purchasedTransfer; }
+    public RequesterItemHandler suppliedTransfer() { return suppliedTransfer; }
     @Nullable public UUID owner() { return owner; }
     public String ownerName() { return ownerName; }
     public int intervalTicks() { return intervalTicks; }
@@ -121,6 +126,28 @@ public final class RequesterBlockEntity extends BlockEntity {
         return level != null && level.getBlockState(worldPosition).is(RequesterMod.REQUESTER.get())
                 && player.distanceToSqr(worldPosition.getX() + 0.5D,
                 worldPosition.getY() + 0.5D, worldPosition.getZ() + 0.5D) <= 64D;
+    }
+
+    @Override public void preRemoveSideEffects(BlockPos pos, BlockState newState) {
+        if (level != null && !level.isClientSide() && !getBlockState().is(newState.getBlock())) {
+            dropContents(level, pos);
+        }
+        super.preRemoveSideEffects(pos, newState);
+    }
+
+    private void dropContents(Level level, BlockPos pos) {
+        for (int slot = 0; slot < purchased.getSlots(); slot++) {
+            drop(level, pos, purchased.extractItem(slot, purchased.getStackInSlot(slot).getCount(), false));
+        }
+        for (int slot = 0; slot < supplied.getSlots(); slot++) {
+            drop(level, pos, supplied.extractItem(slot, supplied.getStackInSlot(slot).getCount(), false));
+        }
+    }
+
+    private static void drop(Level level, BlockPos pos, ItemStack stack) {
+        if (!stack.isEmpty()) {
+            Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), stack);
+        }
     }
 
     public void setSettings(int intervalTicks, boolean actionBar, boolean chat,

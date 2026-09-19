@@ -87,7 +87,7 @@ public final class RequesterMod {
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {
         event.registerBlockEntity(Capabilities.Item.BLOCK, REQUESTER_ENTITY.get(),
                 (box, side) -> side == net.minecraft.core.Direction.DOWN
-                        ? new RequesterItemHandler(box.purchased(), false, true)
-                        : new RequesterItemHandler(box.supplied(), true, false));
+                        ? box.purchasedTransfer()
+                        : box.suppliedTransfer());
     }
 }

@@ -93,8 +93,7 @@ jobs:
             printf '%s\n' "${qshop_jars[@]}"
             exit 1
           fi
-          qshop_jar="${qshop_jars[0]#Q-shop-neoforge-1.26.1.2/}"
-          echo "path=../$qshop_jar" >> "$GITHUB_OUTPUT"
+          echo "path=../${qshop_jars[0]}" >> "$GITHUB_OUTPUT"
 
       - name: Build Requester NeoForge mod
         run: |

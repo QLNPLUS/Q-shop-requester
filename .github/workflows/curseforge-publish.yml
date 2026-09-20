@@ -83,15 +83,23 @@ jobs:
           }
 
       - name: Build QShop NeoForge dependency
+        id: qshop-artifact
         run: |
           chmod +x Q-shop-neoforge-1.26.1.2/gradlew
           (cd Q-shop-neoforge-1.26.1.2 && ./gradlew build --no-daemon)
+          mapfile -t qshop_jars < <(find Q-shop-neoforge-1.26.1.2/build/libs -maxdepth 1 -type f -name 'qshop-neoforge-26.1.2-*.jar' -print)
+          if (( ${#qshop_jars[@]} != 1 )); then
+            echo "Expected exactly one QShop 26.1.2 jar, found: ${#qshop_jars[@]}"
+            printf '%s\n' "${qshop_jars[@]}"
+            exit 1
+          fi
+          qshop_jar="${qshop_jars[0]#Q-shop-neoforge-1.26.1.2/}"
+          echo "path=../$qshop_jar" >> "$GITHUB_OUTPUT"
 
       - name: Build Requester NeoForge mod
         run: |
-          qshop_version="$(sed -n 's/^mod_version=//p' Q-shop-neoforge-1.26.1.2/gradle.properties)"
           chmod +x Q-shop-requester-neoforge-1.26.1.2/gradlew
-          (cd Q-shop-requester-neoforge-1.26.1.2 && ./gradlew -PqshopJar="../Q-shop-neoforge-1.26.1.2/build/libs/qshop-neoforge-26.1.2-${qshop_version}.jar" build --no-daemon)
+          (cd Q-shop-requester-neoforge-1.26.1.2 && ./gradlew "-PqshopJar=${{ steps.qshop-artifact.outputs.path }}" build --no-daemon)
 
       - name: Verify NeoForge release artifact
         id: verify-neoforge-artifact

@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.0] - 2026-09-25
+
+### Forge 1.20.1
+
+### Added
+
+- Added an optional owner-only access setting. Denied attempts show the Action Bar message `该收购箱仅归属玩家可打开`.
+- Applied the supplied GUI offsets as the default layout.
+
+### Changed
+
+- Kept the original background on the item page and used the extended background on the settings page.
+
 ## [1.4.0] - 2026-09-01
 
 ### Forge 1.20.1

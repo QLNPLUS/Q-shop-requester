@@ -9,20 +9,14 @@ on:
         description: Git tag to build and publish
         required: true
         type: string
-      neoforge_ref:
-        description: NeoForge branch or tag to build
-        required: false
-        default: neoforge-1.21.1
-        type: string
-      loader:
-        description: Platform to publish for a manual run
-        required: false
-        default: all
+      platform:
+        description: Platform to build and publish
+        required: true
         type: choice
         options:
-          - all
-          - forge
-          - neoforge
+          - forge-1.20.1
+          - neoforge-1.21.1
+          - neoforge-26.1.2
 
 permissions:
   contents: write
@@ -32,50 +26,99 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  RELEASE_VERSION: ${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
-  NEOFORGE_REF: ${{ inputs.neoforge_ref || 'neoforge-1.21.1' }}
+  RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
 
 jobs:
-  publish-forge:
-    if: ${{ github.event_name == 'release' || inputs.loader == 'all' || inputs.loader == 'forge' }}
+  publish:
+    if: ${{ (github.event_name == 'release' && endsWith(github.event.release.tag_name, matrix.tag_suffix)) || (github.event_name == 'workflow_dispatch' && inputs.platform == matrix.platform) }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: forge-1.20.1
+            tag_suffix: forge-1.20.1
+            loader: forge
+            game_version: 1.20.1
+            java_version: '17'
+            requester_dir: Q-shop-requester-forge-1.20.1
+            qshop_dir: Q-shop
+            qshop_ref: master
+            qshop_artifact: qshop-forge-1.20.1-1.6.2.jar
+            artifact_prefix: qshop-requester-forge-1.20.1
+          - platform: neoforge-1.21.1
+            tag_suffix: neoforge-1.21.1
+            loader: neoforge
+            game_version: 1.21.1
+            java_version: '21'
+            requester_dir: Q-shop-requester-neoforge-1.21.1
+            qshop_dir: Q-shop-neoforge-1.21.1
+            qshop_ref: neoforge-1.21.1
+            qshop_artifact: qshop-neoforge-1.21.1-1.6.2.jar
+            artifact_prefix: qshop-requester-neoforge-1.21.1
+          - platform: neoforge-26.1.2
+            tag_suffix: neoforge-1.26.1.2
+            loader: neoforge
+            game_version: 26.1.2
+            java_version: '25'
+            requester_dir: Q-shop-requester-neoforge-1.26.1.2
+            qshop_dir: Q-shop-neoforge-1.26.1.2
+            qshop_ref: neoforge-1.26.1.2
+            qshop_artifact: qshop-neoforge-26.1.2-1.6.2.jar
+            artifact_prefix: qshop-requester-neoforge-26.1.2
 
     steps:
-      - name: Check out Requester Forge source
+      - name: Check out Requester source
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}
-          path: Q-shop-requester-forge-1.20.1
+          path: ${{ matrix.requester_dir }}
 
-      - name: Check out QShop Forge dependency
+      - name: Check out QShop dependency
         uses: actions/checkout@v4
         with:
           repository: QLNPLUS/Q-shop
-          ref: master
-          path: Q-shop
+          ref: ${{ matrix.qshop_ref }}
+          path: ${{ matrix.qshop_dir }}
 
-      - name: Set up Java 17
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: ${{ matrix.java_version }}
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Remove local build settings
-        run: |
-          ln -s Q-shop Q-shop-forge-1.20.1
-          sed -i -E '/^systemProp\.(http|https)\.proxy(Host|Port)=|^org\.gradle\.java\.home=/d' \
-            Q-shop/gradle.properties \
-            Q-shop-requester-forge-1.20.1/gradle.properties
-
-      - name: Prepare Forge release version
-        id: prepare-forge-version
+      - name: Prepare build directories and remove local settings
         env:
-          RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+          PLATFORM: ${{ matrix.platform }}
+          QSHOP_DIR: ${{ matrix.qshop_dir }}
+          REQUESTER_DIR: ${{ matrix.requester_dir }}
         run: |
-          version="${RELEASE_VERSION#v}"
+          if [[ "$PLATFORM" == "forge-1.20.1" ]]; then
+            ln -s "$QSHOP_DIR" Q-shop-forge-1.20.1
+          fi
+          sed -i -E '/^systemProp\.(http|https)\.proxy(Host|Port)=|^org\.gradle\.java\.home=/d' \
+            "$QSHOP_DIR/gradle.properties" \
+            "$REQUESTER_DIR/gradle.properties"
+
+      - name: Prepare release version
+        id: prepare-version
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          TAG_SUFFIX: ${{ matrix.tag_suffix }}
+        run: |
+          version="${RELEASE_TAG#v}"
+          suffix="-$TAG_SUFFIX"
+          case "$version" in
+            *"$suffix") version="${version%"$suffix"}" ;;
+            *) echo "Release tag does not match platform: $RELEASE_TAG"; exit 1 ;;
+          esac
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Unsupported release tag: $RELEASE_TAG"
+            exit 1
+          fi
           echo "CURSEFORGE_VERSION=$version" >> "$GITHUB_ENV"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
@@ -93,184 +136,74 @@ jobs:
             exit 1
           }
 
-      - name: Build QShop Forge dependency
-        run: |
-          chmod +x Q-shop/gradlew
-          (cd Q-shop && ./gradlew build --no-daemon)
-
-      - name: Build Requester Forge mod
-        run: |
-          chmod +x Q-shop-requester-forge-1.20.1/gradlew
-          (cd Q-shop-requester-forge-1.20.1 && ./gradlew build --no-daemon)
-
-      - name: Verify Forge release artifact
-        id: verify-forge-artifact
-        working-directory: Q-shop-requester-forge-1.20.1
+      - name: Build QShop dependency
         env:
-          RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+          QSHOP_DIR: ${{ matrix.qshop_dir }}
         run: |
-          version="${RELEASE_VERSION#v}"
-          artifact="build/libs/qshop-requester-forge-1.20.1-${version}.jar"
-          test -f "$artifact" || {
-            echo "Missing expected Forge artifact: $artifact"
-            find build/libs -maxdepth 1 -type f -name '*.jar' -print
+          chmod +x "$QSHOP_DIR/gradlew"
+          (cd "$QSHOP_DIR" && ./gradlew build --no-daemon)
+
+      - name: Build Requester mod
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          QSHOP_DIR: ${{ matrix.qshop_dir }}
+          QSHOP_ARTIFACT: ${{ matrix.qshop_artifact }}
+          REQUESTER_DIR: ${{ matrix.requester_dir }}
+        run: |
+          chmod +x "$REQUESTER_DIR/gradlew"
+          if [[ "$PLATFORM" == "neoforge-26.1.2" ]]; then
+            (cd "$REQUESTER_DIR" && ./gradlew "-PqshopJar=../$QSHOP_DIR/build/libs/$QSHOP_ARTIFACT" build --no-daemon)
+          else
+            (cd "$REQUESTER_DIR" && ./gradlew build --no-daemon)
+          fi
+
+      - name: Verify release artifact
+        id: verify-artifact
+        env:
+          CURSEFORGE_VERSION: ${{ steps.prepare-version.outputs.version }}
+          REQUESTER_DIR: ${{ matrix.requester_dir }}
+          ARTIFACT_PREFIX: ${{ matrix.artifact_prefix }}
+        run: |
+          artifact="build/libs/${ARTIFACT_PREFIX}-${CURSEFORGE_VERSION}.jar"
+          test -f "$REQUESTER_DIR/$artifact" || {
+            echo "Missing expected artifact: $REQUESTER_DIR/$artifact"
+            find "$REQUESTER_DIR/build/libs" -maxdepth 1 -type f -name '*.jar' -print
             exit 1
           }
-          echo "path=Q-shop-requester-forge-1.20.1/$artifact" >> "$GITHUB_OUTPUT"
-          echo "name=qshop-requester-forge-1.20.1-${version}" >> "$GITHUB_OUTPUT"
+          echo "path=$REQUESTER_DIR/$artifact" >> "$GITHUB_OUTPUT"
+          echo "name=${ARTIFACT_PREFIX}-${CURSEFORGE_VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Prepare current Forge changelog
-        working-directory: Q-shop-requester-forge-1.20.1
+      - name: Prepare current changelog
+        working-directory: ${{ matrix.requester_dir }}
         env:
-          RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+          CURSEFORGE_VERSION: ${{ steps.prepare-version.outputs.version }}
         run: |
-          version="${RELEASE_VERSION#v}"
-          awk -v version="$version" '
-            /^##[[:space:]]+/ {
-              heading = $2
-              gsub(/^\[/, "", heading)
-              gsub(/\]$/, "", heading)
-              if (found && heading != version) exit
-              if (heading == version) found = 1
-            }
-            found { print }
-          ' CHANGELOG.md > build/curseforge-changelog.md
-          test -s build/curseforge-changelog.md || {
-            echo "Missing CHANGELOG.md section for version $version"
-            exit 1
-          }
+          python - "$CURSEFORGE_VERSION" <<PY
+          from pathlib import Path
+          import sys
 
-      - name: Publish Requester Forge mod file
+          version = sys.argv[1]
+          lines = Path("CHANGELOG.md").read_text(encoding="utf-8").splitlines(keepends=True)
+          start = next((i for i, line in enumerate(lines) if line.startswith(f"## [{version}]")), None)
+          if start is None:
+              raise SystemExit(f"Missing CHANGELOG.md section for version {version}")
+          end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## [")), len(lines))
+          Path("build/curseforge-changelog.md").write_text("".join(lines[start:end]), encoding="utf-8")
+          PY
+          test -s build/curseforge-changelog.md
+
+      - name: Publish Requester mod file
         uses: Kira-NT/mc-publish@v3
         with:
           curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-tag: ${{ env.RELEASE_VERSION }}
-          files: ${{ steps.verify-forge-artifact.outputs.path }}
-          version: ${{ steps.prepare-forge-version.outputs.version }}
-          name: ${{ steps.verify-forge-artifact.outputs.name }}
+          github-tag: ${{ env.RELEASE_TAG }}
+          files: ${{ steps.verify-artifact.outputs.path }}
+          version: ${{ steps.prepare-version.outputs.version }}
+          name: ${{ steps.verify-artifact.outputs.name }}
           version-type: release
-          changelog-file: Q-shop-requester-forge-1.20.1/build/curseforge-changelog.md
-          loaders: forge
-          game-versions: 1.20.1
-          java: 17
-
-  publish-neoforge:
-    if: ${{ github.event_name == 'release' || inputs.loader == 'all' || inputs.loader == 'neoforge' }}
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out Requester NeoForge source
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.NEOFORGE_REF }}
-          path: Q-shop-requester-neoforge-1.21.1
-
-      - name: Check out QShop NeoForge dependency
-        uses: actions/checkout@v4
-        with:
-          repository: QLNPLUS/Q-shop
-          ref: neoforge-1.21.1
-          path: Q-shop-neoforge-1.21.1
-
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Remove local build settings
-        run: |
-          sed -i -E '/^systemProp\.(http|https)\.proxy(Host|Port)=|^org\.gradle\.java\.home=/d' \
-            Q-shop-neoforge-1.21.1/gradle.properties \
-            Q-shop-requester-neoforge-1.21.1/gradle.properties
-
-      - name: Prepare NeoForge release version
-        id: prepare-neoforge-version
-        env:
-          RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
-        run: |
-          version="${RELEASE_VERSION#v}"
-          echo "CURSEFORGE_VERSION=$version" >> "$GITHUB_ENV"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Validate CurseForge configuration
-        env:
-          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
-          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
-        run: |
-          test -n "$CURSEFORGE_PROJECT_ID" || {
-            echo "Missing repository variable CURSEFORGE_PROJECT_ID"
-            exit 1
-          }
-          test -n "$CURSEFORGE_TOKEN" || {
-            echo "Missing repository secret CURSEFORGE_TOKEN"
-            exit 1
-          }
-
-      - name: Build QShop NeoForge dependency
-        run: |
-          chmod +x Q-shop-neoforge-1.21.1/gradlew
-          (cd Q-shop-neoforge-1.21.1 && ./gradlew build --no-daemon)
-
-      - name: Build Requester NeoForge mod
-        run: |
-          chmod +x Q-shop-requester-neoforge-1.21.1/gradlew
-          (cd Q-shop-requester-neoforge-1.21.1 && ./gradlew build --no-daemon)
-
-      - name: Verify NeoForge release artifact
-        id: verify-neoforge-artifact
-        working-directory: Q-shop-requester-neoforge-1.21.1
-        env:
-          RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
-        run: |
-          version="${RELEASE_VERSION#v}"
-          artifact="build/libs/qshop-requester-neoforge-1.21.1-${version}.jar"
-          test -f "$artifact" || {
-            echo "Missing expected NeoForge artifact: $artifact"
-            find build/libs -maxdepth 1 -type f -name '*.jar' -print
-            exit 1
-          }
-          echo "path=Q-shop-requester-neoforge-1.21.1/$artifact" >> "$GITHUB_OUTPUT"
-          echo "name=qshop-requester-neoforge-1.21.1-${version}" >> "$GITHUB_OUTPUT"
-
-      - name: Prepare current NeoForge changelog
-        working-directory: Q-shop-requester-neoforge-1.21.1
-        env:
-          RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
-        run: |
-          version="${RELEASE_VERSION#v}"
-          awk -v version="$version" '
-            /^##[[:space:]]+/ {
-              heading = $2
-              gsub(/^\[/, "", heading)
-              gsub(/\]$/, "", heading)
-              if (found && heading != version) exit
-              if (heading == version) found = 1
-            }
-            found { print }
-          ' CHANGELOG.md > build/curseforge-changelog.md
-          test -s build/curseforge-changelog.md || {
-            echo "Missing CHANGELOG.md section for version $version"
-            exit 1
-          }
-
-      - name: Publish Requester NeoForge mod file
-        uses: Kira-NT/mc-publish@v3
-        with:
-          curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID }}
-          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-tag: ${{ env.RELEASE_VERSION }}
-          files: ${{ steps.verify-neoforge-artifact.outputs.path }}
-          version: ${{ steps.prepare-neoforge-version.outputs.version }}
-          name: ${{ steps.verify-neoforge-artifact.outputs.name }}
-          version-type: release
-          changelog-file: Q-shop-requester-neoforge-1.21.1/build/curseforge-changelog.md
-          loaders: neoforge
-          game-versions: 1.21.1
-          java: 21
+          changelog-file: ${{ matrix.requester_dir }}/build/curseforge-changelog.md
+          loaders: ${{ matrix.loader }}
+          game-versions: ${{ matrix.game_version }}
+          java: ${{ matrix.java_version }}

@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.UUID;
 
 public final class RequesterNetwork {
-    private static final String PROTOCOL = "3";
+    private static final String PROTOCOL = "4";
 
     private RequesterNetwork() {}
 
@@ -54,7 +54,7 @@ public final class RequesterNetwork {
         box.migrateLegacyTarget();
         PacketDistributor.sendToPlayer(player, new SyncStatePacket(
                 box.getBlockPos(), box.intervalTicks(), box.showActionBarNotification(),
-                box.showChatNotification(), box.enabled(), box.owner(), box.ownerName(),
+                box.showChatNotification(), box.enabled(), box.ownerOnlyOpen(), box.owner(), box.ownerName(),
                 box.shopUuid(), box.tabUuid(), box.entryUuid()));
     }
 
@@ -104,10 +104,10 @@ public final class RequesterNetwork {
     }
 
     public static void sendSettings(BlockPos pos, int intervalTicks, boolean actionBar,
-                                    boolean chat, boolean enabled, String shopUuid,
+                                    boolean chat, boolean enabled, boolean ownerOnlyOpen, String shopUuid,
                                     String tabUuid, String entryUuid) {
         net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(new SetSettingsPacket(pos, intervalTicks, actionBar, chat,
-                enabled, shopUuid, tabUuid, entryUuid));
+                enabled, ownerOnlyOpen, shopUuid, tabUuid, entryUuid));
     }
 
     public static void openShopForSelection(BlockPos pos, String shopUuid) {
@@ -186,7 +186,8 @@ public final class RequesterNetwork {
     }
 
     public record SyncStatePacket(BlockPos pos, int intervalTicks, boolean actionBar,
-                                  boolean chat, boolean enabled, UUID owner, String ownerName,
+                                  boolean chat, boolean enabled, boolean ownerOnlyOpen,
+                                  UUID owner, String ownerName,
                                   String shopUuid,
                                   String tabUuid, String entryUuid)  implements CustomPacketPayload{
         public static final CustomPacketPayload.Type<SyncStatePacket> TYPE = new CustomPacketPayload.Type<>(
@@ -197,6 +198,7 @@ public final class RequesterNetwork {
         public static void encode(SyncStatePacket p, RegistryFriendlyByteBuf b) {
             b.writeBlockPos(p.pos); b.writeVarInt(p.intervalTicks);
             b.writeBoolean(p.actionBar); b.writeBoolean(p.chat); b.writeBoolean(p.enabled);
+            b.writeBoolean(p.ownerOnlyOpen);
             b.writeBoolean(p.owner != null);
             if (p.owner != null) b.writeUUID(p.owner);
             b.writeUtf(p.ownerName == null ? "" : p.ownerName, 64);
@@ -210,9 +212,10 @@ public final class RequesterNetwork {
             boolean actionBar = b.readBoolean();
             boolean chat = b.readBoolean();
             boolean enabled = b.readBoolean();
+            boolean ownerOnlyOpen = b.readBoolean();
             UUID owner = b.readBoolean() ? b.readUUID() : null;
             String ownerName = b.readUtf(64);
-            return new SyncStatePacket(pos, intervalTicks, actionBar, chat, enabled, owner, ownerName,
+            return new SyncStatePacket(pos, intervalTicks, actionBar, chat, enabled, ownerOnlyOpen, owner, ownerName,
                     b.readUtf(128), b.readUtf(128), b.readUtf(128));
         }
         public static void handle(SyncStatePacket p, IPayloadContext context) {
@@ -339,7 +342,7 @@ public final class RequesterNetwork {
     }
 
     public record SetSettingsPacket(BlockPos pos, int intervalTicks, boolean actionBar,
-                                    boolean chat, boolean enabled, String shopUuid,
+                                    boolean chat, boolean enabled, boolean ownerOnlyOpen, String shopUuid,
                                     String tabUuid, String entryUuid)  implements CustomPacketPayload{
         public static final CustomPacketPayload.Type<SetSettingsPacket> TYPE = new CustomPacketPayload.Type<>(
                 net.minecraft.resources.Identifier.fromNamespaceAndPath(RequesterMod.MODID, "set_settings"));
@@ -348,12 +351,14 @@ public final class RequesterNetwork {
 
         public static void encode(SetSettingsPacket p, RegistryFriendlyByteBuf b) {
             b.writeBlockPos(p.pos); b.writeVarInt(p.intervalTicks); b.writeBoolean(p.actionBar);
-            b.writeBoolean(p.chat); b.writeBoolean(p.enabled); b.writeUtf(p.shopUuid, 128);
+            b.writeBoolean(p.chat); b.writeBoolean(p.enabled); b.writeBoolean(p.ownerOnlyOpen);
+            b.writeUtf(p.shopUuid, 128);
             b.writeUtf(p.tabUuid, 128); b.writeUtf(p.entryUuid, 128);
         }
         public static SetSettingsPacket decode(RegistryFriendlyByteBuf b) {
             return new SetSettingsPacket(b.readBlockPos(), b.readVarInt(), b.readBoolean(),
-                    b.readBoolean(), b.readBoolean(), b.readUtf(128), b.readUtf(128), b.readUtf(128));
+                    b.readBoolean(), b.readBoolean(), b.readBoolean(), b.readUtf(128),
+                    b.readUtf(128), b.readUtf(128));
         }
         public static void handle(SetSettingsPacket p, IPayloadContext context) {
             ServerPlayer sender = (ServerPlayer) context.player();
@@ -366,7 +371,7 @@ public final class RequesterNetwork {
                                 "qshop_requester.message.target_unavailable"));
                         return;
                     }
-                    box.setSettings(p.intervalTicks, p.actionBar, p.chat, p.enabled,
+                    box.setSettings(p.intervalTicks, p.actionBar, p.chat, p.enabled, p.ownerOnlyOpen,
                             p.shopUuid, p.tabUuid, p.entryUuid);
                     sendState(sender, box);
                 } else {
@@ -403,6 +408,11 @@ public final class RequesterNetwork {
                 context.enqueueWork(() -> {
                     if (!(sender.level().getBlockEntity(packet.pos) instanceof RequesterBlockEntity box)
                             || !box.stillValid(sender)) return;
+                    if (box.owner() != null && !box.canEdit(sender)) {
+                        sender.sendSystemMessage(net.minecraft.network.chat.Component.translatable(
+                                "qshop_requester.message.not_owner"));
+                        return;
+                    }
                     box.setOwner(sender.getUUID(), sender.getPlainTextName());
                     broadcastState(sender.level().getServer(), box);
                 });

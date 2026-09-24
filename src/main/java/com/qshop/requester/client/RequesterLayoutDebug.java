@@ -49,7 +49,8 @@ public final class RequesterLayoutDebug {
         INTERVAL_INPUT("Interval input", 1),
         INTERVAL_UNIT("Interval unit button", 1),
         ACTION_BAR_NOTIFICATION("Action Bar checkbox", 1),
-        CHAT_NOTIFICATION("Chat checkbox", 1);
+        CHAT_NOTIFICATION("Chat checkbox", 1),
+        OWNER_ONLY_OPEN("Owner-only open checkbox", 1);
 
         private final String label;
         private final int tab;

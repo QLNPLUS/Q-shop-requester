@@ -28,8 +28,8 @@ public final class RequesterTextures {
     public static void background(GuiGraphicsExtractor g, int x, int y) {
         g.blit(RenderPipelines.GUI_TEXTURED, BACKGROUND, x, y, 0, 0, 176, 166, 176, 166);
     }
-    public static void ownerBackground(GuiGraphicsExtractor g, int x, int y) {
-        g.blit(RenderPipelines.GUI_TEXTURED, OWNER_BACKGROUND, x, y, 0, 0, 176, 166, 176, 166);
+    public static void ownerBackground(GuiGraphicsExtractor g, int x, int y, int height) {
+        g.blit(RenderPipelines.GUI_TEXTURED, OWNER_BACKGROUND, x, y, 0, 0, 176, height, 176, height);
     }
     public static void tab(GuiGraphicsExtractor g, int x, int y, int column, boolean selected) {
         int sx = Math.max(0, Math.min(column, 6)) * 26;

@@ -34,6 +34,7 @@ public final class RequesterBlockEntity extends BlockEntity {
     private boolean actionBarNotifications = true;
     private boolean chatNotifications = true;
     private boolean enabled = true;
+    private boolean ownerOnlyOpen;
     private String shopUuid = "";
     private String tabUuid = "";
     private String entryUuid = "";
@@ -69,6 +70,7 @@ public final class RequesterBlockEntity extends BlockEntity {
     public boolean showActionBarNotification() { return actionBarNotifications; }
     public boolean showChatNotification() { return chatNotifications; }
     public boolean enabled() { return enabled; }
+    public boolean ownerOnlyOpen() { return ownerOnlyOpen; }
     public String shopUuid() { return shopUuid; }
     public String tabUuid() { return tabUuid; }
     public String entryUuid() { return entryUuid; }
@@ -115,6 +117,10 @@ public final class RequesterBlockEntity extends BlockEntity {
         return player.hasPermissions(2) || owner != null && owner.equals(player.getUUID());
     }
 
+    public boolean canOpen(Player player) {
+        return !ownerOnlyOpen || owner == null || owner.equals(player.getUUID());
+    }
+
     public boolean stillValid(Player player) {
         return level != null && level.getBlockState(worldPosition).is(RequesterMod.REQUESTER.get())
                 && player.distanceToSqr(worldPosition.getX() + 0.5D,
@@ -122,11 +128,13 @@ public final class RequesterBlockEntity extends BlockEntity {
     }
 
     public void setSettings(int intervalTicks, boolean actionBar, boolean chat,
-                            boolean enabled, String shopUuid, String tabUuid, String entryUuid) {
+                            boolean enabled, boolean ownerOnlyOpen,
+                            String shopUuid, String tabUuid, String entryUuid) {
         this.intervalTicks = Math.max(20, Math.min(intervalTicks, MAX_INTERVAL_TICKS));
         this.actionBarNotifications = actionBar;
         this.chatNotifications = chat;
         this.enabled = enabled;
+        this.ownerOnlyOpen = ownerOnlyOpen;
         this.shopUuid = bounded(shopUuid);
         this.tabUuid = bounded(tabUuid);
         this.entryUuid = bounded(entryUuid);
@@ -148,6 +156,7 @@ public final class RequesterBlockEntity extends BlockEntity {
         tag.putBoolean("actionBar", actionBarNotifications);
         tag.putBoolean("chat", chatNotifications);
         tag.putBoolean("enabled", enabled);
+        tag.putBoolean("ownerOnlyOpen", ownerOnlyOpen);
         tag.putString("shopUuid", shopUuid);
         tag.putString("tabUuid", tabUuid);
         tag.putString("entryUuid", entryUuid);
@@ -170,6 +179,7 @@ public final class RequesterBlockEntity extends BlockEntity {
         actionBarNotifications = !tag.contains("actionBar") || tag.getBoolean("actionBar");
         chatNotifications = !tag.contains("chat") || tag.getBoolean("chat");
         enabled = !tag.contains("enabled") || tag.getBoolean("enabled");
+        ownerOnlyOpen = tag.getBoolean("ownerOnlyOpen");
         shopUuid = tag.getString("shopUuid");
         tabUuid = tag.getString("tabUuid");
         entryUuid = tag.getString("entryUuid");

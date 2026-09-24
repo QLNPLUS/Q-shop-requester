@@ -24,8 +24,12 @@ public final class RequesterTextures {
         return ResourceLocation.fromNamespaceAndPath("qshop_requester", "textures/gui/" + name);
     }
 
-    public static void background(GuiGraphics g, int x, int y) { g.blit(BACKGROUND, x, y, 0, 0, 176, 166, 176, 166); }
-    public static void ownerBackground(GuiGraphics g, int x, int y) { g.blit(OWNER_BACKGROUND, x, y, 0, 0, 176, 166, 176, 166); }
+    public static void background(GuiGraphics g, int x, int y) {
+        g.blit(BACKGROUND, x, y, 0, 0, 176, 166, 176, 166);
+    }
+    public static void ownerBackground(GuiGraphics g, int x, int y, int height) {
+        g.blit(OWNER_BACKGROUND, x, y, 0, 0, 176, height, 176, height);
+    }
     public static void tab(GuiGraphics g, int x, int y, int column, boolean selected) {
         int sx = Math.max(0, Math.min(column, 6)) * 26;
         g.blit(TABS, x, y, sx, selected ? 32 : 0, 26, 32, 182, 128);

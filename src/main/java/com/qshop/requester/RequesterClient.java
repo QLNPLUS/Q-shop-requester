@@ -43,7 +43,7 @@ public final class RequesterClient {
         if (Minecraft.getInstance().screen instanceof RequesterScreen screen
                 && screen.getMenu().pos().equals(packet.pos())) {
             screen.getMenu().setSettings(packet.intervalTicks(), packet.actionBar(), packet.chat(),
-                    packet.enabled(), packet.shopUuid(), packet.tabUuid(), packet.entryUuid());
+                    packet.enabled(), packet.ownerOnlyOpen(), packet.shopUuid(), packet.tabUuid(), packet.entryUuid());
             screen.getMenu().setOwnerData(packet.owner(), packet.ownerName());
             screen.refreshIntervalInput();
         }

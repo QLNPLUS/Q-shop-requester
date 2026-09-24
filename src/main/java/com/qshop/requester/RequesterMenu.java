@@ -18,6 +18,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
     private boolean actionBar = true;
     private boolean chat = true;
     private boolean enabled = true;
+    private boolean ownerOnlyOpen;
     private UUID owner;
     private String ownerName = "";
     private String shopUuid = "";
@@ -65,6 +66,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
         actionBar = box.showActionBarNotification();
         chat = box.showChatNotification();
         enabled = box.enabled();
+        ownerOnlyOpen = box.ownerOnlyOpen();
         owner = box.owner();
         ownerName = box.ownerName();
         shopUuid = box.shopUuid();
@@ -78,6 +80,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
     public boolean actionBar() { return actionBar; }
     public boolean chat() { return chat; }
     public boolean enabled() { return enabled; }
+    public boolean ownerOnlyOpen() { return ownerOnlyOpen; }
     public UUID owner() { return owner; }
     public String ownerName() { return ownerName; }
     public String shopUuid() { return shopUuid; }
@@ -85,11 +88,13 @@ public final class RequesterMenu extends AbstractContainerMenu {
     public String entryUuid() { return entryUuid; }
 
     public void setSettings(int intervalTicks, boolean actionBar, boolean chat,
-                            boolean enabled, String shopUuid, String tabUuid, String entryUuid) {
+                            boolean enabled, boolean ownerOnlyOpen,
+                            String shopUuid, String tabUuid, String entryUuid) {
         this.intervalTicks = Math.max(20, Math.min(intervalTicks, RequesterBlockEntity.MAX_INTERVAL_TICKS));
         this.actionBar = actionBar;
         this.chat = chat;
         this.enabled = enabled;
+        this.ownerOnlyOpen = ownerOnlyOpen;
         this.shopUuid = shopUuid == null ? "" : shopUuid;
         this.tabUuid = tabUuid == null ? "" : tabUuid;
         this.entryUuid = entryUuid == null ? "" : entryUuid;
@@ -100,7 +105,9 @@ public final class RequesterMenu extends AbstractContainerMenu {
         this.ownerName = ownerName == null ? "" : ownerName;
     }
 
-    @Override public boolean stillValid(Player player) { return box.stillValid(player); }
+    @Override public boolean stillValid(Player player) {
+        return box.stillValid(player) && box.canOpen(player);
+    }
 
     @Override public ItemStack quickMoveStack(Player player, int index) {
         ItemStack empty = ItemStack.EMPTY;

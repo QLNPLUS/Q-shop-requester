@@ -54,13 +54,13 @@ jobs:
           fi
           case "$platform" in
             forge-1.20.1)
-              matrix='{"include":[{"platform":"forge-1.20.1","tag_suffix":"forge-1.20.1","loader":"forge","game_version":"1.20.1","java_version":"17","requester_dir":"Q-shop-requester-forge-1.20.1","qshop_dir":"Q-shop","qshop_ref":"master","qshop_artifact":"qshop-forge-1.20.1-1.6.2.jar","artifact_prefix":"qshop-requester-forge-1.20.1"}]}'
+              matrix='{"include":[{"platform":"forge-1.20.1","tag_suffix":"forge-1.20.1","loader":"forge","game_version":"1.20.1","java_version":"17","requester_dir":"Q-shop-requester-forge-1.20.1","qshop_dir":"Q-shop","qshop_ref":"v1.6.2-forge-1.20.1","qshop_artifact":"qshop-forge-1.20.1-1.6.2.jar","artifact_prefix":"qshop-requester-forge-1.20.1"}]}'
               ;;
             neoforge-1.21.1)
-              matrix='{"include":[{"platform":"neoforge-1.21.1","tag_suffix":"neoforge-1.21.1","loader":"neoforge","game_version":"1.21.1","java_version":"21","requester_dir":"Q-shop-requester-neoforge-1.21.1","qshop_dir":"Q-shop-neoforge-1.21.1","qshop_ref":"neoforge-1.21.1","qshop_artifact":"qshop-neoforge-1.21.1-1.6.2.jar","artifact_prefix":"qshop-requester-neoforge-1.21.1"}]}'
+              matrix='{"include":[{"platform":"neoforge-1.21.1","tag_suffix":"neoforge-1.21.1","loader":"neoforge","game_version":"1.21.1","java_version":"21","requester_dir":"Q-shop-requester-neoforge-1.21.1","qshop_dir":"Q-shop-neoforge-1.21.1","qshop_ref":"v1.6.2-neoforge-1.21.1","qshop_artifact":"qshop-neoforge-1.21.1-1.6.2.jar","artifact_prefix":"qshop-requester-neoforge-1.21.1"}]}'
               ;;
             neoforge-26.1.2)
-              matrix='{"include":[{"platform":"neoforge-26.1.2","tag_suffix":"neoforge-1.26.1.2","loader":"neoforge","game_version":"26.1.2","java_version":"25","requester_dir":"Q-shop-requester-neoforge-1.26.1.2","qshop_dir":"Q-shop-neoforge-1.26.1.2","qshop_ref":"neoforge-1.26.1.2","qshop_artifact":"qshop-neoforge-26.1.2-1.6.2.jar","artifact_prefix":"qshop-requester-neoforge-26.1.2"}]}'
+              matrix='{"include":[{"platform":"neoforge-26.1.2","tag_suffix":"neoforge-1.26.1.2","loader":"neoforge","game_version":"26.1.2","java_version":"25","requester_dir":"Q-shop-requester-neoforge-1.26.1.2","qshop_dir":"Q-shop-neoforge-1.26.1.2","qshop_ref":"v1.6.2-neoforge-1.26.1.2","qshop_artifact":"qshop-neoforge-26.1.2-1.6.2.jar","artifact_prefix":"qshop-requester-neoforge-26.1.2"}]}'
               ;;
             *) echo "Unsupported platform: $platform"; exit 1 ;;
           esac

@@ -41,6 +41,7 @@ public final class RequesterBlockEntity extends BlockEntity {
     private boolean actionBarNotifications = true;
     private boolean chatNotifications = true;
     private boolean enabled = true;
+    private boolean ownerOnlyOpen;
     private String shopId = "";
     private int tabIndex = 0;
     private int entryIndex = 0;
@@ -72,6 +73,7 @@ public final class RequesterBlockEntity extends BlockEntity {
     public boolean showActionBarNotification() { return actionBarNotifications; }
     public boolean showChatNotification() { return chatNotifications; }
     public boolean enabled() { return enabled; }
+    public boolean ownerOnlyOpen() { return ownerOnlyOpen; }
     public String shopId() { return shopId; }
     public int tabIndex() { return tabIndex; }
     public int entryIndex() { return entryIndex; }
@@ -94,6 +96,10 @@ public final class RequesterBlockEntity extends BlockEntity {
         return player.hasPermissions(2) || owner != null && owner.equals(player.getUUID());
     }
 
+    public boolean canOpen(Player player) {
+        return !ownerOnlyOpen || owner == null || owner.equals(player.getUUID());
+    }
+
     public boolean stillValid(Player player) {
         return level != null && level.getBlockState(worldPosition).is(RequesterMod.REQUESTER.get())
                 && player.distanceToSqr(worldPosition.getX() + 0.5D,
@@ -101,11 +107,13 @@ public final class RequesterBlockEntity extends BlockEntity {
     }
 
     public void setSettings(int intervalTicks, boolean actionBar, boolean chat,
-                            boolean enabled, String shopId, int tabIndex, int entryIndex) {
+                            boolean enabled, boolean ownerOnlyOpen, String shopId,
+                            int tabIndex, int entryIndex) {
         this.intervalTicks = Math.max(20, Math.min(intervalTicks, MAX_INTERVAL_TICKS));
         this.actionBarNotifications = actionBar;
         this.chatNotifications = chat;
         this.enabled = enabled;
+        this.ownerOnlyOpen = ownerOnlyOpen;
         this.shopId = shopId == null ? "" : shopId.substring(0, Math.min(128, shopId.length()));
         this.tabIndex = Math.max(0, tabIndex);
         this.entryIndex = Math.max(0, entryIndex);
@@ -124,6 +132,7 @@ public final class RequesterBlockEntity extends BlockEntity {
         tag.putBoolean("actionBar", actionBarNotifications);
         tag.putBoolean("chat", chatNotifications);
         tag.putBoolean("enabled", enabled);
+        tag.putBoolean("ownerOnlyOpen", ownerOnlyOpen);
         tag.putString("shopId", shopId);
         tag.putInt("tabIndex", tabIndex);
         tag.putInt("entryIndex", entryIndex);
@@ -141,6 +150,7 @@ public final class RequesterBlockEntity extends BlockEntity {
         actionBarNotifications = !tag.contains("actionBar") || tag.getBoolean("actionBar");
         chatNotifications = !tag.contains("chat") || tag.getBoolean("chat");
         enabled = !tag.contains("enabled") || tag.getBoolean("enabled");
+        ownerOnlyOpen = tag.getBoolean("ownerOnlyOpen");
         shopId = tag.getString("shopId");
         tabIndex = Math.max(0, tag.getInt("tabIndex"));
         entryIndex = Math.max(0, tag.getInt("entryIndex"));

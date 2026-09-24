@@ -30,6 +30,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     private static final int DARK = 0xFF555555;
     private static final int BUTTON_H = 16;
     private static final int MAX_BUTTON_W = 160;
+    private static final int ITEMS_PAGE_HEIGHT = 166;
+    private static final int SETTINGS_PAGE_HEIGHT = 180;
 
     private enum IntervalUnit {
         SECONDS("qshop_requester.unit.seconds", 20L),
@@ -70,11 +72,12 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     public RequesterScreen(RequesterMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
         imageWidth = 176;
-        imageHeight = 166;
+        imageHeight = ITEMS_PAGE_HEIGHT;
         inventoryLabelY = 74;
     }
 
     @Override protected void init() {
+        imageHeight = pageHeight();
         super.init();
         RequesterEmiCompat.setSettingsScreen(tab == 1);
         RequesterLayoutDebug.beginScreen();
@@ -162,7 +165,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (tab == 1) {
             // Put the opaque settings page over the base container page, then
             // draw the selected tab on top of it like Q-shop sellbox.
-            RequesterTextures.ownerBackground(g, leftPos, topPos);
+            RequesterTextures.ownerBackground(g, leftPos, topPos, imageHeight);
             flushAll(g);
             renderSettings(g, mx, my);
         }
@@ -306,6 +309,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 Component.translatable("qshop_requester.setting.action_bar"), menu.actionBar());
         drawNotification(g, mx, my, RequesterLayoutDebug.Widget.CHAT_NOTIFICATION, 8, 152,
                 Component.translatable("qshop_requester.setting.chat"), menu.chat());
+        drawNotification(g, mx, my, RequesterLayoutDebug.Widget.OWNER_ONLY_OPEN, 8, 165,
+                Component.translatable("qshop_requester.setting.owner_only_open"), menu.ownerOnlyOpen());
     }
 
     private void drawAvatar(GuiGraphics g, int x, int y, UUID owner) {
@@ -447,7 +452,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (index < 0 || index >= visibleTargets.size()) return;
         RequesterNetwork.TargetInfo target = visibleTargets.get(index);
         menu.setSettings(menu.intervalTicks(), menu.actionBar(), menu.chat(), menu.enabled(),
-                target.shopId, target.tabIndex, target.entryIndex);
+                menu.ownerOnlyOpen(), target.shopId, target.tabIndex, target.entryIndex);
         sendSettings();
     }
 
@@ -459,7 +464,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     public void selectTargetFromShop(String shopId, int tabIndex, int entryIndex) {
         menu.setSettings(menu.intervalTicks(), menu.actionBar(), menu.chat(), menu.enabled(),
-                shopId, tabIndex, entryIndex);
+                menu.ownerOnlyOpen(), shopId, tabIndex, entryIndex);
         sendSettings();
     }
 
@@ -470,9 +475,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             catch (NumberFormatException ignored) { }
         }
         menu.setSettings(interval, menu.actionBar(), menu.chat(), menu.enabled(),
-                menu.shopId(), menu.tabIndex(), menu.entryIndex());
+                menu.ownerOnlyOpen(), menu.shopId(), menu.tabIndex(), menu.entryIndex());
         RequesterNetwork.sendSettings(menu.pos(), interval, menu.actionBar(), menu.chat(), menu.enabled(),
-                menu.shopId(), menu.tabIndex(), menu.entryIndex());
+                menu.ownerOnlyOpen(), menu.shopId(), menu.tabIndex(), menu.entryIndex());
     }
 
     private void syncInputPosition() {
@@ -489,6 +494,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     private void setTab(int next) {
         if (tab == 1 && next != 1) sendSettings();
         tab = next;
+        imageHeight = pageHeight();
+        topPos = (height - imageHeight) / 2;
         RequesterEmiCompat.setSettingsScreen(next == 1);
         dropdown = false;
         if (searchInput != null) {
@@ -500,6 +507,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             if (next == 0) intervalInput.setFocused(false);
         }
         RequesterLayoutDebug.ensureSelected(next);
+    }
+
+    private int pageHeight() {
+        return tab == 0 ? ITEMS_PAGE_HEIGHT : SETTINGS_PAGE_HEIGHT;
     }
 
     private void cycleUnit() {
@@ -558,12 +569,19 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             if (inside(mx, my, screenX(RequesterLayoutDebug.Widget.ACTION_BAR_NOTIFICATION, 8),
                     screenY(RequesterLayoutDebug.Widget.ACTION_BAR_NOTIFICATION, 139), 160, 12)) {
                 menu.setSettings(menu.intervalTicks(), !menu.actionBar(), menu.chat(), menu.enabled(),
-                        menu.shopId(), menu.tabIndex(), menu.entryIndex()); sendSettings(); return true;
+                        menu.ownerOnlyOpen(), menu.shopId(), menu.tabIndex(), menu.entryIndex());
+                sendSettings(); return true;
             }
             if (inside(mx, my, screenX(RequesterLayoutDebug.Widget.CHAT_NOTIFICATION, 8),
                     screenY(RequesterLayoutDebug.Widget.CHAT_NOTIFICATION, 152), 160, 12)) {
                 menu.setSettings(menu.intervalTicks(), menu.actionBar(), !menu.chat(), menu.enabled(),
-                        menu.shopId(), menu.tabIndex(), menu.entryIndex()); sendSettings(); return true;
+                        menu.ownerOnlyOpen(), menu.shopId(), menu.tabIndex(), menu.entryIndex()); sendSettings(); return true;
+            }
+            if (inside(mx, my, screenX(RequesterLayoutDebug.Widget.OWNER_ONLY_OPEN, 8),
+                    screenY(RequesterLayoutDebug.Widget.OWNER_ONLY_OPEN, 165), 160, 12)) {
+                menu.setSettings(menu.intervalTicks(), menu.actionBar(), menu.chat(), menu.enabled(),
+                        !menu.ownerOnlyOpen(), menu.shopId(), menu.tabIndex(), menu.entryIndex());
+                sendSettings(); return true;
             }
             if (handleSearchClick(mx, my, button)) return true;
             if (intervalInput != null && intervalInput.mouseClicked(mx, my, button)) {
@@ -730,6 +748,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 case INTERVAL_UNIT -> 121;
                 case ACTION_BAR_NOTIFICATION -> 139;
                 case CHAT_NOTIFICATION -> 152;
+                case OWNER_ONLY_OPEN -> 165;
                 default -> 0;
             });
             width = switch (widget) {
@@ -741,7 +760,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 case SELECTED_INFO -> 160;
                 case INTERVAL_INPUT -> 96;
                 case INTERVAL_UNIT -> 64;
-                case ACTION_BAR_NOTIFICATION, CHAT_NOTIFICATION -> 160;
+                case ACTION_BAR_NOTIFICATION, CHAT_NOTIFICATION, OWNER_ONLY_OPEN -> 160;
                 default -> 20;
             };
             height = switch (widget) {

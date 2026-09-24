@@ -45,6 +45,11 @@ public final class RequesterBlock extends BaseEntityBlock {
                                            Player player, InteractionHand hand, BlockHitResult hit) {
         if (!(player instanceof ServerPlayer serverPlayer)) return InteractionResult.SUCCESS;
         if (level.getBlockEntity(pos) instanceof RequesterBlockEntity box) {
+            if (!box.canOpen(serverPlayer)) {
+                serverPlayer.displayClientMessage(Component.translatable(
+                        "qshop_requester.message.owner_only_open"), true);
+                return InteractionResult.CONSUME;
+            }
             NetworkHooks.openScreen(serverPlayer, new net.minecraft.world.MenuProvider() {
                 @Override public Component getDisplayName() {
                     return Component.translatable("container.qshop_requester.requester");

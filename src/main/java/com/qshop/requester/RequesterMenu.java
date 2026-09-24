@@ -18,6 +18,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
     private boolean actionBar = true;
     private boolean chat = true;
     private boolean enabled = true;
+    private boolean ownerOnlyOpen;
     private UUID owner;
     private String ownerName = "";
     private String shopId = "";
@@ -65,6 +66,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
         actionBar = box.showActionBarNotification();
         chat = box.showChatNotification();
         enabled = box.enabled();
+        ownerOnlyOpen = box.ownerOnlyOpen();
         owner = box.owner();
         ownerName = box.ownerName();
         shopId = box.shopId();
@@ -78,6 +80,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
     public boolean actionBar() { return actionBar; }
     public boolean chat() { return chat; }
     public boolean enabled() { return enabled; }
+    public boolean ownerOnlyOpen() { return ownerOnlyOpen; }
     public UUID owner() { return owner; }
     public String ownerName() { return ownerName; }
     public String shopId() { return shopId; }
@@ -85,11 +88,13 @@ public final class RequesterMenu extends AbstractContainerMenu {
     public int entryIndex() { return entryIndex; }
 
     public void setSettings(int intervalTicks, boolean actionBar, boolean chat,
-                            boolean enabled, String shopId, int tabIndex, int entryIndex) {
+                            boolean enabled, boolean ownerOnlyOpen, String shopId,
+                            int tabIndex, int entryIndex) {
         this.intervalTicks = Math.max(20, Math.min(intervalTicks, RequesterBlockEntity.MAX_INTERVAL_TICKS));
         this.actionBar = actionBar;
         this.chat = chat;
         this.enabled = enabled;
+        this.ownerOnlyOpen = ownerOnlyOpen;
         this.shopId = shopId == null ? "" : shopId;
         this.tabIndex = Math.max(0, tabIndex);
         this.entryIndex = Math.max(0, entryIndex);
@@ -100,7 +105,9 @@ public final class RequesterMenu extends AbstractContainerMenu {
         this.ownerName = ownerName == null ? "" : ownerName;
     }
 
-    @Override public boolean stillValid(Player player) { return box.stillValid(player); }
+    @Override public boolean stillValid(Player player) {
+        return box.stillValid(player) && box.canOpen(player);
+    }
 
     @Override public ItemStack quickMoveStack(Player player, int index) {
         ItemStack empty = ItemStack.EMPTY;

@@ -133,7 +133,7 @@ public final class RequesterLayoutDebug {
         values.put(Widget.SETTINGS_TITLE, new Position(0, 1));
         values.put(Widget.OWNER_AVATAR, new Position(-5, 3));
         values.put(Widget.OWNER_INFO, new Position(-6, -1));
-        values.put(Widget.OWNER_BUTTON, new Position(-28, 5));
+        values.put(Widget.OWNER_BUTTON, new Position(32, 5));
         values.put(Widget.SEARCH_INPUT, new Position(0, 1));
         values.put(Widget.TARGET_BUTTON, new Position(0, 2));
         values.put(Widget.SELECTED_INFO, new Position(0, 1));
@@ -142,6 +142,7 @@ public final class RequesterLayoutDebug {
         values.put(Widget.INTERVAL_UNIT, new Position(1, -3));
         values.put(Widget.ACTION_BAR_NOTIFICATION, new Position(0, -4));
         values.put(Widget.CHAT_NOTIFICATION, new Position(0, -3));
+        values.put(Widget.OWNER_ONLY_OPEN, new Position(0, -2));
         return values;
     }
 

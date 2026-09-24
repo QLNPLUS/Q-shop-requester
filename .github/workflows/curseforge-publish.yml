@@ -29,43 +29,50 @@ env:
   RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
 
 jobs:
+  select-platform:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'release' && (endsWith(github.event.release.tag_name, 'forge-1.20.1') || endsWith(github.event.release.tag_name, 'neoforge-1.21.1') || endsWith(github.event.release.tag_name, 'neoforge-1.26.1.2'))) }}
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - name: Select release platform
+        id: select
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          REQUESTED_PLATFORM: ${{ inputs.platform }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            platform="$REQUESTED_PLATFORM"
+          else
+            case "$RELEASE_TAG" in
+              *-forge-1.20.1) platform=forge-1.20.1 ;;
+              *-neoforge-1.21.1) platform=neoforge-1.21.1 ;;
+              *-neoforge-1.26.1.2) platform=neoforge-26.1.2 ;;
+              *) echo "Unsupported release tag: $RELEASE_TAG"; exit 1 ;;
+            esac
+          fi
+          case "$platform" in
+            forge-1.20.1)
+              matrix='{"include":[{"platform":"forge-1.20.1","tag_suffix":"forge-1.20.1","loader":"forge","game_version":"1.20.1","java_version":"17","requester_dir":"Q-shop-requester-forge-1.20.1","qshop_dir":"Q-shop","qshop_ref":"master","qshop_artifact":"qshop-forge-1.20.1-1.6.2.jar","artifact_prefix":"qshop-requester-forge-1.20.1"}]}'
+              ;;
+            neoforge-1.21.1)
+              matrix='{"include":[{"platform":"neoforge-1.21.1","tag_suffix":"neoforge-1.21.1","loader":"neoforge","game_version":"1.21.1","java_version":"21","requester_dir":"Q-shop-requester-neoforge-1.21.1","qshop_dir":"Q-shop-neoforge-1.21.1","qshop_ref":"neoforge-1.21.1","qshop_artifact":"qshop-neoforge-1.21.1-1.6.2.jar","artifact_prefix":"qshop-requester-neoforge-1.21.1"}]}'
+              ;;
+            neoforge-26.1.2)
+              matrix='{"include":[{"platform":"neoforge-26.1.2","tag_suffix":"neoforge-1.26.1.2","loader":"neoforge","game_version":"26.1.2","java_version":"25","requester_dir":"Q-shop-requester-neoforge-1.26.1.2","qshop_dir":"Q-shop-neoforge-1.26.1.2","qshop_ref":"neoforge-1.26.1.2","qshop_artifact":"qshop-neoforge-26.1.2-1.6.2.jar","artifact_prefix":"qshop-requester-neoforge-26.1.2"}]}'
+              ;;
+            *) echo "Unsupported platform: $platform"; exit 1 ;;
+          esac
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   publish:
-    if: ${{ (github.event_name == 'release' && endsWith(github.event.release.tag_name, matrix.tag_suffix)) || (github.event_name == 'workflow_dispatch' && inputs.platform == matrix.platform) }}
+    needs: select-platform
+    if: ${{ needs.select-platform.result == 'success' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - platform: forge-1.20.1
-            tag_suffix: forge-1.20.1
-            loader: forge
-            game_version: 1.20.1
-            java_version: '17'
-            requester_dir: Q-shop-requester-forge-1.20.1
-            qshop_dir: Q-shop
-            qshop_ref: master
-            qshop_artifact: qshop-forge-1.20.1-1.6.2.jar
-            artifact_prefix: qshop-requester-forge-1.20.1
-          - platform: neoforge-1.21.1
-            tag_suffix: neoforge-1.21.1
-            loader: neoforge
-            game_version: 1.21.1
-            java_version: '21'
-            requester_dir: Q-shop-requester-neoforge-1.21.1
-            qshop_dir: Q-shop-neoforge-1.21.1
-            qshop_ref: neoforge-1.21.1
-            qshop_artifact: qshop-neoforge-1.21.1-1.6.2.jar
-            artifact_prefix: qshop-requester-neoforge-1.21.1
-          - platform: neoforge-26.1.2
-            tag_suffix: neoforge-1.26.1.2
-            loader: neoforge
-            game_version: 26.1.2
-            java_version: '25'
-            requester_dir: Q-shop-requester-neoforge-1.26.1.2
-            qshop_dir: Q-shop-neoforge-1.26.1.2
-            qshop_ref: neoforge-1.26.1.2
-            qshop_artifact: qshop-neoforge-26.1.2-1.6.2.jar
-            artifact_prefix: qshop-requester-neoforge-26.1.2
+      matrix: ${{ fromJSON(needs.select-platform.outputs.matrix) }}
 
     steps:
       - name: Check out Requester source

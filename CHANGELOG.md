@@ -2,6 +2,14 @@
 
 Release notes are grouped by Minecraft loader when a release supports both Forge and NeoForge.
 
+## [1.5.1] - 2026-10-04
+
+### NeoForge 26.1.2
+
+#### Fixed
+
+- Fixed compatibility with QShop 1.8.3 limit resets based on Minecraft world days.
+
 ## [1.5.0] - 2026-09-25
 
 ### NeoForge 26.1.2

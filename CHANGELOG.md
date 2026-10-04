@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.1] - 2026-10-04
+
+### Forge 1.20.1
+
+### Fixed
+
+- Fixed compatibility with QShop 1.8.3 limit resets based on Minecraft world days.
+
 ## [1.5.0] - 2026-09-25
 
 ### Forge 1.20.1

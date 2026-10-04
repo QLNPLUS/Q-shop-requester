@@ -166,7 +166,7 @@ public final class RequesterNetwork {
         String key = entry.uuid != null && !entry.uuid.isEmpty()
                 ? shop.id + "|" + entry.uuid
                 : shop.id + "|" + tabIndex + "|" + entryIndex;
-        String period = entry.reset.periodKey();
+        String period = entry.reset.periodKey(player.getServer());
         if (entry.globalLimit > 0) {
             int used = QShopSavedData.get(player.getServer()).globalCounts.getCount(key, period);
             if (entry.globalLimit - used < 1) return false;

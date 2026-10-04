@@ -35,7 +35,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: QLNPLUS/Q-shop
-          ref: v1.6.2-neoforge-1.21.1
+          ref: 14f0cdaccab90c748edcf58c88c4cd029c99f069
           path: Q-shop-neoforge-1.21.1
 
       - name: Set up Java 21

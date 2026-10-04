@@ -111,7 +111,7 @@ public final class RequesterService {
                                                   ServerPlayer onlineOwner, UUID owner, Shop shop,
                                                   ShopEntry entry, int tabIndex, int entryIndex) {
         String key = limitKey(shop, tabIndex, entryIndex, entry);
-        String period = entry.reset.periodKey();
+        String period = entry.reset.periodKey(server);
         int units = availableUnits(server, owner, entry, key, period);
         if (units <= 0) return failure(TradeResult.Status.LIMIT_REACHED);
         if (onlineOwner != null && !QShopTradeEvents.postBefore(onlineOwner, shop,

@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.5.2] - 2026-11-02
+
+### Forge 1.20.1
+
+### Fixed
+
+- Fixed the requester counting zero available items when a requested item has no NBT tag but the same item inside the requester carries an empty tag.
+
+
 ## [1.5.1] - 2026-10-04
 
 ### Forge 1.20.1

@@ -432,11 +432,39 @@ public final class RequesterService {
         int count = 0;
         for (int slot = 0; slot < handler.getSlots(); slot++) {
             ItemStack stack = handler.getStackInSlot(slot);
-            if (ItemStack.isSameItemSameTags(stack, target)) {
+            if (sameItem(stack, target)) {
                 count = Math.min(Integer.MAX_VALUE, count + stack.getCount());
             }
         }
         return count;
+    }
+
+    /**
+     * 判断两个物品栈是否是"同一种物品"。
+     *
+     * <p>{@link ItemStack#isSameItemSameTags} 用 {@code Objects.equals} 比较 NBT,
+     * 因此"没有 NBT 标签"与"空标签 {@code {}}"会被判成不同物品。这个差异对玩家不可见:
+     * 请求条目里手写/脚本生成的物品通常没有 tag,而容器里被其它模组 {@code getOrCreateTag()}
+     * 触碰过的同一件物品会带一个空标签,结果就是请求器判定"一件都没有",永远凑不齐。
+     *
+     * <p>这里先按原版严格比较(保留 Forge 能力兼容性检查),只对空标签的情况放宽。
+     */
+    private static boolean sameItem(ItemStack a, ItemStack b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        if (ItemStack.isSameItemSameTags(a, b)) {
+            return true;
+        }
+        if (!a.is(b.getItem())) {
+            return false;
+        }
+        return isEmptyTag(a) && isEmptyTag(b);
+    }
+
+    private static boolean isEmptyTag(ItemStack stack) {
+        CompoundTag tag = stack.getTag();
+        return tag == null || tag.isEmpty();
     }
 
     private static int insertItems(IItemHandler handler, ItemStack stack) {
@@ -470,7 +498,7 @@ public final class RequesterService {
         int remaining = amount;
         for (int slot = 0; slot < handler.getSlots() && remaining > 0; slot++) {
             ItemStack stack = handler.getStackInSlot(slot);
-            if (!ItemStack.isSameItemSameTags(stack, target)) continue;
+            if (!sameItem(stack, target)) continue;
             ItemStack extracted = handler.extractItem(slot, Math.min(remaining, stack.getCount()), false);
             remaining -= extracted.getCount();
         }

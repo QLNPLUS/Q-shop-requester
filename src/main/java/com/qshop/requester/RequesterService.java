@@ -15,6 +15,7 @@ import com.qshop.wallet.IWallet;
 import com.qshop.wallet.WalletCapability;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
@@ -23,6 +24,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.storage.LevelResource;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
@@ -419,11 +421,51 @@ public final class RequesterService {
         int count = 0;
         for (int slot = 0; slot < handler.getSlots(); slot++) {
             ItemStack stack = handler.getStackInSlot(slot);
-            if (ItemStack.isSameItemSameComponents(stack, target)) {
+            if (sameItem(stack, target)) {
                 count = Math.min(Integer.MAX_VALUE, count + stack.getCount());
             }
         }
         return count;
+    }
+
+    /**
+     * 判断两个物品栈是否是"同一种物品"。
+     *
+     * <p>{@link ItemStack#isSameItemSameComponents} 比较的是整张组件补丁(prototype + patch),
+     * 因此"带一个显式空 custom_data 组件"与"完全没有该组件"会被判成不同物品。这个差异对玩家
+     * 不可见:请求条目里手写/脚本生成的物品通常不带组件,而容器里被其它模组 set 过空 CustomData
+     * 的同一件物品会带一个空组件,结果就是请求器判定"一件都没有",永远凑不齐。
+     *
+     * <p>这里先按原版严格比较,只对空 custom_data 的情况放宽;其它组件仍严格比较。
+     */
+    private static boolean sameItem(ItemStack a, ItemStack b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        if (ItemStack.isSameItemSameComponents(a, b)) {
+            return true;
+        }
+        if (!a.is(b.getItem())) {
+            return false;
+        }
+        if (!isEmptyCustomData(a) || !isEmptyCustomData(b)) {
+            return false;
+        }
+        return ItemStack.isSameItemSameComponents(withoutEmptyCustomData(a), withoutEmptyCustomData(b));
+    }
+
+    private static boolean isEmptyCustomData(ItemStack stack) {
+        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
+        return data == null || data.copyTag().isEmpty();
+    }
+
+    private static ItemStack withoutEmptyCustomData(ItemStack stack) {
+        if (stack.get(DataComponents.CUSTOM_DATA) == null || !isEmptyCustomData(stack)) {
+            return stack;
+        }
+        ItemStack copy = stack.copy();
+        copy.remove(DataComponents.CUSTOM_DATA);
+        return copy;
     }
 
     private static int insertItems(IItemHandler handler, ItemStack stack) {
@@ -457,7 +499,7 @@ public final class RequesterService {
         int remaining = amount;
         for (int slot = 0; slot < handler.getSlots() && remaining > 0; slot++) {
             ItemStack stack = handler.getStackInSlot(slot);
-            if (!ItemStack.isSameItemSameComponents(stack, target)) continue;
+            if (!sameItem(stack, target)) continue;
             ItemStack extracted = handler.extractItem(slot, Math.min(remaining, stack.getCount()), false);
             remaining -= extracted.getCount();
         }

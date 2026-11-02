@@ -2,6 +2,15 @@
 
 Release notes are grouped by Minecraft loader when a release supports both Forge and NeoForge.
 
+## [1.5.2] - 2026-11-02
+
+### NeoForge 26.1.2
+
+#### Fixed
+
+- Fixed the requester counting zero available items when a requested item carries no `custom_data` component but the same item inside the requester carries an empty one.
+
+
 ## [1.5.1] - 2026-10-04
 
 ### NeoForge 26.1.2
